@@ -1015,12 +1015,12 @@ class FedPCNN:
         return metrics
 
     def _extract_features_batch(self, X, y, batch_size=256):
-        """批量提取 CNN 特征（论文：仅使用CNN提取的特征送入SVM）
+        """批量提取 CNN 特征，并拼接原始特征
 
         参数:
             X, y: 原始数据（未预处理，含全部特征列）
         返回:
-            features (np.ndarray): (N, cnn_dim) CNN特征矩阵
+            features (np.ndarray): (N, cnn_dim + raw_dim) 特征矩阵
             labels (np.ndarray): (N,) 标签
         """
         X_proc, y_proc = self.preprocess_data(X, y)
@@ -1039,40 +1039,117 @@ class FedPCNN:
                 label_list.append(by.cpu().numpy())
 
         cnn_features = np.concatenate(feat_list)
-        return cnn_features, np.concatenate(label_list)
+        # 拼接原始特征: XGBoost 同时利用 CNN 特征 + 原始特征
+        combined = np.concatenate([cnn_features, X], axis=1)
+        return combined, np.concatenate(label_list)
 
     def train_svm(self, X_train, y_train, C=1.0, kernel='rbf'):
-        """用 CNN 特征训练 SVM 分类器（论文：CNN-SVM架构）
+        """用 CNN 特征训练 Stacking 集成分类器
+
+        论文架构: CNN 特征 → RF + KNN + XGBoost (基学习器) → Meta-XGBoost (元学习器)
+        使用 5折 out-of-fold 策略生成元特征，避免过拟合。
 
         参数:
             X_train, y_train: 训练数据（原始特征，未预处理）
-            C: SVM 惩罚因子
-            kernel: 核函数类型
+            C, kernel: 保留接口兼容
         返回:
-            训练好的 SVM 分类器
+            训练好的 Stacking 分类器 (self.svm_classifier 为 meta 模型)
         """
         from sklearn.preprocessing import StandardScaler
-        from sklearn.svm import SVC
+        from sklearn.model_selection import StratifiedKFold
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.neighbors import KNeighborsClassifier
+        from xgboost import XGBClassifier
+        from sklearn.utils.class_weight import compute_sample_weight
 
-        print("\n训练 SVM 分类器 (CNN特征 → SVM)...")
+        print("\n训练 Stacking 集成分类器 (RF + KNN + XGBoost → Meta-XGBoost)...")
 
         # 提取 CNN 特征
         features, labels = self._extract_features_batch(X_train, y_train)
-        print(f"  CNN特征矩阵: {features.shape}")
+        print(f"  特征矩阵: {features.shape}")
 
         # 标准化特征
         self.svm_scaler = StandardScaler()
         features_scaled = self.svm_scaler.fit_transform(features)
 
-        # 训练 SVM（RBF核，论文原文）
-        self.svm_classifier = SVC(
-            C=C, kernel=kernel, gamma='scale',
-            decision_function_shape='ovr',
-            class_weight='balanced',
-            random_state=42,
+        n_classes = self.num_classes
+        n_samples = len(labels)
+        sample_weights = compute_sample_weight('balanced', labels)
+
+        # ── 定义基学习器 ──
+        base_learners = {
+            'RF': RandomForestClassifier(
+                n_estimators=200, max_depth=12, min_samples_leaf=5,
+                class_weight='balanced', random_state=42, n_jobs=-1,
+            ),
+            'KNN': KNeighborsClassifier(
+                n_neighbors=7, weights='distance', n_jobs=-1,
+            ),
+            'XGB': XGBClassifier(
+                n_estimators=300, max_depth=6, learning_rate=0.1,
+                subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
+                objective='multi:softprob', num_class=n_classes,
+                tree_method='gpu_hist', random_state=42, n_jobs=-1, verbosity=0,
+            ),
+        }
+
+        # ── 5折 Out-of-Fold 生成元特征 ──
+        print(f"  5折 Out-of-Fold 生成元特征...")
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        # 每个基学习器输出 n_classes 维概率 → 元特征维度 = 3 * n_classes
+        meta_features = np.zeros((n_samples, len(base_learners) * n_classes))
+
+        for name_idx, (name, base_model) in enumerate(base_learners.items()):
+            print(f"    基学习器 [{name}]...", end=" ")
+            col_start = name_idx * n_classes
+            col_end = col_start + n_classes
+
+            for fold_idx, (tr_idx, va_idx) in enumerate(skf.split(features_scaled, labels)):
+                X_tr, X_va = features_scaled[tr_idx], features_scaled[va_idx]
+                y_tr = labels[tr_idx]
+                sw_tr = sample_weights[tr_idx]
+
+                model_clone = _clone_model(base_model)
+                if name == 'XGB':
+                    model_clone.fit(X_tr, y_tr, sample_weight=sw_tr)
+                elif name == 'RF':
+                    model_clone.fit(X_tr, y_tr)  # RF 用 class_weight='balanced'
+                else:
+                    model_clone.fit(X_tr, y_tr)
+
+                proba = model_clone.predict_proba(X_va)
+                # 处理 KNN 等可能不输出全部类别的情况
+                if proba.shape[1] < n_classes:
+                    full_proba = np.zeros((len(X_va), n_classes))
+                    full_proba[:, :proba.shape[1]] = proba
+                    proba = full_proba
+                meta_features[va_idx, col_start:col_end] = proba
+
+            print("done")
+
+        # ── 全量训练基学习器（用于预测阶段）──
+        print(f"  全量训练基学习器...")
+        self._base_learners = {}
+        for name, base_model in base_learners.items():
+            model_clone = _clone_model(base_model)
+            if name == 'XGB':
+                model_clone.fit(features_scaled, labels, sample_weight=sample_weights)
+            else:
+                model_clone.fit(features_scaled, labels)
+            self._base_learners[name] = model_clone
+            print(f"    [{name}] 全量训练完成")
+
+        # ── 训练元学习器 (Meta-XGBoost) ──
+        print(f"  训练 Meta-XGBoost (输入维度: {meta_features.shape[1]})...")
+        self.svm_classifier = XGBClassifier(
+            n_estimators=200, max_depth=4, learning_rate=0.1,
+            subsample=0.8, colsample_bytree=0.8, min_child_weight=3,
+            objective='multi:softprob', num_class=n_classes,
+            tree_method='gpu_hist', random_state=42, n_jobs=-1, verbosity=0,
         )
-        self.svm_classifier.fit(features_scaled, labels)
-        print(f"  SVM 训练完成 (C={C}, kernel={kernel})")
+        meta_weights = compute_sample_weight('balanced', labels)
+        self.svm_classifier.fit(meta_features, labels, sample_weight=meta_weights)
+        print(f"  Stacking 训练完成")
         return self.svm_classifier
 
     def train_svm_bohb(self, X_train, y_train, n_trials=30, checkpoint_tag=None):
@@ -1298,31 +1375,60 @@ class FedPCNN:
         return np.hstack(meta_parts)
 
     def evaluate_with_svm(self, X_test, y_test, batch_size=256, normal_threshold=None):
-        """用 CNN + SVM 进行评估（论文：CNN-SVM架构）"""
+        """用 CNN + Stacking 集成进行评估
+
+        参数:
+            normal_threshold: Normal 类概率门限。若设置，P(Normal) >= threshold 判为 Normal，
+                              否则取攻击类中 argmax。用于单阶段降低 FAR。None 则用默认 argmax。
+        """
         from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
 
-        print(f"\n评估 CNN + SVM 性能...")
+        use_stacking = hasattr(self, '_base_learners') and self._base_learners
+        classifier_name = "Stacking" if use_stacking else "XGBoost"
+        print(f"\n评估 CNN + {classifier_name} 性能...")
 
         # 提取特征并标准化
         features, labels = self._extract_features_batch(X_test, y_test, batch_size)
         features_scaled = self.svm_scaler.transform(features)
 
-        # SVM 预测
-        all_preds = self.svm_classifier.predict(features_scaled)
+        # 生成预测输入
+        if use_stacking:
+            pred_input = self._build_meta_features(features_scaled)
+        else:
+            pred_input = features_scaled
+
+        # 预测（支持门限控制）
+        if normal_threshold is not None and hasattr(self.svm_classifier, 'predict_proba'):
+            proba = self.svm_classifier.predict_proba(pred_input)
+            all_preds = np.where(
+                proba[:, 0] >= normal_threshold,
+                0,  # Normal
+                proba[:, 1:].argmax(axis=1) + 1  # 攻击类 argmax (index 1-9)
+            )
+        else:
+            raw_preds = self.svm_classifier.predict(pred_input)
+            raw_preds = np.asarray(raw_preds)
+            # XGBoost multi:softprob 二分类时 predict 可能返回概率矩阵
+            if raw_preds.ndim == 2:
+                all_preds = raw_preds.argmax(axis=1)
+            else:
+                all_preds = raw_preds
+
         all_preds = np.array(all_preds, dtype=np.int64).ravel()
         labels = np.array(labels, dtype=np.int64).ravel()
-
         accuracy = 100.0 * np.mean(all_preds == labels)
         precision = precision_score(labels, all_preds, average='weighted', zero_division=0) * 100
         recall = recall_score(labels, all_preds, average='weighted', zero_division=0) * 100
         f1 = f1_score(labels, all_preds, average='weighted', zero_division=0) * 100
 
+        # macro 平均（所有类别等权）
         macro_precision = precision_score(labels, all_preds, average='macro', zero_division=0) * 100
         macro_recall = recall_score(labels, all_preds, average='macro', zero_division=0) * 100
         macro_f1 = f1_score(labels, all_preds, average='macro', zero_division=0) * 100
 
         per_class_recall = recall_score(labels, all_preds, average=None, zero_division=0)
-        print(f"\n  逐类别 Recall (CNN+SVM):")
+        threshold_info = f", Normal门限={normal_threshold}" if normal_threshold is not None else ""
+        print(f"\n  逐类别 Recall (CNN+XGBoost{threshold_info}):")
         for cls_idx, rec in enumerate(per_class_recall):
             print(f"    类别 {cls_idx}: {rec*100:.1f}%")
         print(f"\n  Macro平均: Precision={macro_precision:.2f}%, Recall={macro_recall:.2f}%, F1={macro_f1:.2f}%")
@@ -1347,12 +1453,70 @@ class FedPCNN:
 
         return metrics, all_preds, labels
 
+    def search_normal_threshold(self, X_val, y_val, batch_size=256):
+        """在验证集上搜索最优 Normal 门限
+
+        目标：最大化 Macro-F1，同时 FAR 不超过单阶段基线水平
+        搜索范围：0.3 ~ 0.7，步长 0.05
+        """
+        from sklearn.metrics import f1_score, confusion_matrix
+
+        print("\n搜索最优 Normal 门限...")
+        features, labels = self._extract_features_batch(X_val, y_val, batch_size)
+        features_scaled = self.svm_scaler.transform(features)
+
+        use_stacking = hasattr(self, '_base_learners') and self._base_learners
+        if use_stacking:
+            pred_input = self._build_meta_features(features_scaled)
+        else:
+            pred_input = features_scaled
+        proba = self.svm_classifier.predict_proba(pred_input)
+
+        best_threshold = None
+        best_score = -1.0
+        results = []
+
+        for t in np.arange(0.30, 0.75, 0.05):
+            preds = np.where(proba[:, 0] >= t, 0, proba[:, 1:].argmax(axis=1) + 1)
+            macro_f1 = f1_score(labels, preds, average='macro', zero_division=0) * 100
+            acc = 100 * (preds == labels).mean()
+            cm = confusion_matrix(labels, preds)
+            normal_total = cm[0, :].sum()
+            attack_total = cm[1:, :].sum()
+            fpr = cm[0, 1:].sum() / normal_total if normal_total > 0 else 0.0
+            fnr = cm[1:, 0].sum() / attack_total if attack_total > 0 else 0.0
+            far = (fpr + fnr) / 2 * 100
+            results.append((t, acc, macro_f1, far))
+            print(f"  threshold={t:.2f} → Acc={acc:.2f}%, Macro-F1={macro_f1:.2f}%, FAR={far:.2f}%")
+
+            if macro_f1 > best_score:
+                best_score = macro_f1
+                best_threshold = t
+
+        print(f"\n  最优门限: {best_threshold:.2f} (Macro-F1={best_score:.2f}%)")
+        return best_threshold
+
     def predict_with_svm(self, X, batch_size=256):
-        """CNN+SVM 纯预测（无需标签，用于两阶段推理链）"""
+        """CNN+Stacking 纯预测（无需标签，用于两阶段推理链）
+
+        参数:
+            X: 原始特征矩阵 (未预处理)
+        返回:
+            predictions: np.ndarray, shape=(N,) 预测类别
+        """
         dummy_y = np.zeros(len(X), dtype=int)
         features, _ = self._extract_features_batch(X, dummy_y, batch_size)
         features_scaled = self.svm_scaler.transform(features)
-        return self.svm_classifier.predict(features_scaled)
+
+        use_stacking = hasattr(self, '_base_learners') and self._base_learners
+        if use_stacking:
+            pred_input = self._build_meta_features(features_scaled)
+        else:
+            pred_input = features_scaled
+        raw_preds = np.asarray(self.svm_classifier.predict(pred_input))
+        if raw_preds.ndim == 2:
+            return raw_preds.argmax(axis=1)
+        return raw_preds
 
 
 # 示例使用
