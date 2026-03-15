@@ -3,7 +3,7 @@ os.environ['LOKY_MAX_CPU_COUNT'] = '1'  # 防止 joblib 在 Windows 上检测 CP
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler, RobustScaler, OneHotEncoder
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, RobustScaler, StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mutual_info_score
@@ -158,7 +158,7 @@ class NSLKDDPreprocessor:
         self.classification = classification
         self.test_size = test_size
         self.seed = seed
-        self.scaler = RobustScaler(quantile_range=(10, 90))  # MinMaxScaler→RobustScaler: 对网络流量极端离群值更稳健
+        self.scaler = StandardScaler()  # 叶子超 §3.2.3: Z-score标准化
         self.label_encoder = LabelEncoder()
         self.feature_names = self._get_feature_names()
 
@@ -350,12 +350,13 @@ class UNSWNB15Preprocessor:
         y_test  = y_all[test_idx]
         print(f"分层划分完成: 训练+验证 {len(y_train):,}  测试 {len(y_test):,}")
 
-        # MRMR 特征选择：top-20 硬截断（实验验证为最优截断点）
+        # MRMR 特征选择：累积阈值截断（叶子超 §3.5: 阈值范围[0.2, 0.8]）
         selected_cols = mrmr_feature_selection(
             X_train_df, y_train,
             categorical_cols=categorical_cols,
             n_bins=15,
-            top_k=20
+            threshold=0.8,
+            top_k=None,
         )
         self.selected_feature_names_ = selected_cols
 
@@ -363,35 +364,30 @@ class UNSWNB15Preprocessor:
         X_train_df = X_train_df[selected_cols]
         X_test_df  = X_test_df[selected_cols]
 
-        # 分类特征 → LabelEncoding（不做 OneHot，贴近论文）
-        # 连续特征 → RobustScaler
+        # 分类特征 → OneHot 编码（叶子超 §3.2: 独热编码数值化字符串特征）
         selected_cat_cols = [c for c in categorical_cols if c in selected_cols]
         selected_num_cols = [c for c in selected_cols if c not in selected_cat_cols]
 
-        # LabelEncoding: 分类特征转为整数编码
-        self._label_encoders = {}
-        for col in selected_cat_cols:
-            le = LabelEncoder()
-            X_train_df[col] = le.fit_transform(X_train_df[col].astype(str))
-            X_test_df[col] = X_test_df[col].astype(str).map(
-                lambda x, le=le: le.transform([x])[0] if x in le.classes_ else 0
-            )
-            self._label_encoders[col] = le
+        if selected_cat_cols:
+            # 合并做OneHot保证列对齐
+            combined = pd.concat([X_train_df, X_test_df], ignore_index=True)
+            combined = pd.get_dummies(combined, columns=selected_cat_cols)
+            X_train_df = combined.iloc[:len(X_train_df)].reset_index(drop=True)
+            X_test_df = combined.iloc[len(X_train_df):].reset_index(drop=True)
 
-        # ColumnTransformer: 全部用 RobustScaler（LabelEncoded 列也做缩放）
-        ct = ColumnTransformer(transformers=[
-            ('num', RobustScaler(quantile_range=(10, 90)), selected_cols),
-        ])
-        X_train = ct.fit_transform(X_train_df)
-        X_test  = ct.transform(X_test_df)
-        self.column_transformer_ = ct
-        self.n_continuous_ = len(selected_cols)  # 全部特征都是数值型
+        # Z-score 标准化（叶子超 §3.2.3: Z-score 方法数据标准化）
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train_df.values.astype(float))
+        X_test  = scaler.transform(X_test_df.values.astype(float))
+        self.scaler_ = scaler
+        self.n_continuous_ = X_train.shape[1]
 
         # 打印维度信息
-        print(f"\n[预处理] LabelEncoding + RobustScaler (无 OneHot)")
+        print(f"\n[预处理] OneHot + Z-score标准化 (叶子超论文)")
         print(f"  连续特征: {len(selected_num_cols)} 列")
         if selected_cat_cols:
-            print(f"  类别特征: {selected_cat_cols} → LabelEncoding")
+            print(f"  类别特征: {selected_cat_cols} → OneHot编码")
         print(f"  最终特征维度: {X_train.shape[1]}")
 
         # 打印类别分布
