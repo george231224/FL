@@ -1,0 +1,30 @@
+# Python版本: 3.8
+# CUDA: 12.1
+
+# 深度学习
+torch==2.4.1
+torchvision==0.19.1
+
+# 科学计算
+numpy==1.24.4
+scipy==1.10.1
+
+# 机器学习
+scikit-learn==1.3.2
+xgboost==1.7.6
+
+# 超参搜索
+optuna==4.5.0
+
+# 数据处理
+pandas==2.0.3
+
+# 可视化
+matplotlib==3.7.5
+seaborn==0.13.2
+
+# 进度条
+tqdm==4.67.1
+
+# 数据集下载
+requests==2.32.4

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data
+data/
+*.csv
+!requirements.txt
+
+# Results (large/generated files)
+results/
+checkpoints/
+output.log
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# PDF papers
+*.pdf
+
+# Environment
+.env
+venv/
+.venv/
+
+# Claude
+.claude/
