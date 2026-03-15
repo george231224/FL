@@ -120,17 +120,15 @@ def partition_data(X_train, y_train, partition_type='iid', num_clients=10, alpha
 def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device='cpu',
                 global_rounds=50, local_epochs=5, classification='multi',
                 dynamic_agg=False, bohb_trials=0):
+    """FedPCNN 实验（论文算法4.2：FedProx + CNN-SVM）"""
     print("=" * 60)
-    print("FedPCNN ")
+    print("FedPCNN (论文算法4.2)")
     print("=" * 60)
-
-    # 断点续训标识
-    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}"
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
 
-    # 拆分验证集（20%）
+    # 拆分验证集（20%）用于早停
     X_train, X_val, y_train, y_val = train_test_split(
         X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
     )
@@ -139,13 +137,10 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print(f"  验证集: {X_val.shape}")
     print(f"  测试集: {X_test.shape}")
 
-    # 配置
+    # 论文配置: 10个设备
     num_devices = 10
-
-    #  关键：实际划分数据
     client_data = partition_data(X_train, y_train, partition_type, num_devices, alpha)
 
-    # 1D CNN 输入形状: (channels=1, total_features)
     input_shape = (1, n_features)
 
     print(f"\n模型配置:")
@@ -154,82 +149,37 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print(f"  类别数: {n_classes}")
     print(f"  数据划分: {partition_type.upper()}" + (f" (alpha={alpha})" if partition_type == 'non-iid' else ""))
 
-    # 初始化模型（n_continuous: CNN 只处理连续特征，OneHot 直连 XGBoost）
     fedpcnn = FedPCNN(
         num_devices=num_devices,
         num_classes=n_classes,
         input_shape=input_shape,
-        n_continuous=n_continuous
     )
 
     if hasattr(fedpcnn, 'device'):
         fedpcnn.device = device
 
     print("\n开始训练...")
-
     client_data_list = [client_data[i] for i in range(num_devices)]
 
-    # ── 按数据集分开配置 ──────────────────────────────────────────────────
-    is_unsw = dataset_name.upper().startswith('UNSW')
-
-    if is_unsw:
-        # UNSW-NB15: 启用SMOTE处理类别不平衡
-        use_smote = True
-        use_crt = True
-        use_logit_cal = True
-        if n_classes == 2:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.01, 0.1, 10, 0.6, 0.0
-        else:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.3, 1.5
-    else:
-        # NSL-KDD: 保留原有最优配置
-        use_smote = True
-        use_crt = True
-        use_logit_cal = True
-        if n_classes == 2:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.01, 0.1, 10, 0.6, 0.0
-        else:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.6, 1.5
-
-    # SMOTE + pre_smote_class_weights
-    pre_smote_class_weights = None
-    client_data_raw = None        # 保留原始数据用于预热
-    smote_warmup_rounds = 0
-    if use_smote:
-        pre_smote_labels = np.concatenate([y for _, y in client_data_list])
-        pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
-        pre_smote_cw = 1.0 / pre_smote_counts
-        min_cw = pre_smote_cw.min()
-        cw_cap = 30.0 if n_classes > 5 else 15.0
-        pre_smote_cw = np.clip(pre_smote_cw, 0, min_cw * cw_cap)
-        pre_smote_cw = pre_smote_cw / pre_smote_cw.sum() * n_classes
-        pre_smote_class_weights = torch.FloatTensor(pre_smote_cw)
-
-        # Non-IID 场景：取消SMOTE预热，从第1轮直接用SMOTE数据，避免切换震荡
-        if partition_type == 'non-iid':
-            client_data_raw = None
-            smote_warmup_rounds = 0
-
-        from data_preprocessing import apply_smote_per_client
-        client_data_list = apply_smote_per_client(
-            client_data_list, num_classes=n_classes,
-            dataset_name=dataset_name, classification=classification, k_neighbors=5,
-        )
+    # 论文算法4.2：标准 FedProx + CE loss，无 SMOTE/cRT/Logit校准
+    hp_lr = 0.01
+    hp_mu = 0.01
+    hp_local_epochs = local_epochs
+    hp_gamma = 0.5       # γ-不精确解参数
+    hp_focal_gamma = 0.0  # 0 = 标准 CrossEntropyLoss
 
     print(f"\n  配置 ({dataset_name}):")
     print(f"    lr={hp_lr}, mu={hp_mu}, local_epochs={hp_local_epochs}, "
           f"gamma={hp_gamma}, focal_gamma={hp_focal_gamma}")
-    print(f"    SMOTE={'ON' if use_smote else 'OFF'}, "
-          f"cRT={'ON' if use_crt else 'OFF'}, "
-          f"Logit校准={'ON' if use_logit_cal else 'OFF'}, "
-          f"动态聚合={'ON' if dynamic_agg else 'OFF'}")
+
+    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}"
 
     train_loss, val_loss = fedpcnn.train(
         client_data=client_data_list,
         global_rounds=global_rounds,
         local_epochs=hp_local_epochs,
-        client_fraction=1.0 if (partition_type != 'iid' or n_classes == 2) else 0.7,
-        batch_size=256,
+        client_fraction=1.0,  # 论文: 所有设备参与
+        batch_size=64,        # 论文常用 batch size
         lr=hp_lr,
         mu=hp_mu,
         gamma=hp_gamma,
@@ -238,169 +188,76 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         X_val=X_val,
         y_val=y_val,
         eval_interval=5,
-        pre_smote_class_weights=pre_smote_class_weights,
-        client_data_raw=client_data_raw,
-        smote_warmup_rounds=smote_warmup_rounds,
         checkpoint_tag=ckpt_tag,
     )
 
-    # ── 训练完成，立即保存模型权重（防止后续步骤中断丢失） ──────────────
+    # 保存模型权重
     import torch as _torch
     tag = f"FedPCNN_{dataset_name}_{partition_type}_{classification}"
     os.makedirs('./results/models', exist_ok=True)
     model_path = f"./results/models/{tag}_model.pt"
-    model_state = {
+    _torch.save({
         'global_model': fedpcnn.global_model.state_dict(),
         'input_shape': input_shape,
         'num_classes': n_classes,
-        'train_loss': train_loss,
-        'val_loss': val_loss,
-    }
-    _torch.save(model_state, model_path)
-    print(f"\n模型权重已保存（训练阶段）: {model_path}")
-
-    # cRT 分类器重训练
-    if use_crt and n_classes > 2:
-        fedpcnn.classifier_retrain(X_train, y_train, epochs=10, lr=0.01)
-
-    # Logit 偏置校准
-    logit_bias = None
-    if use_logit_cal:
-        logit_bias = fedpcnn.calibrate_thresholds(X_val, y_val)
+    }, model_path)
+    print(f"\n模型权重已保存: {model_path}")
 
     # 纯 CNN 评估
     print("\n开始评估...")
-    metrics_cnn = fedpcnn.evaluate(X_test, y_test, logit_bias=logit_bias)
+    metrics_cnn = fedpcnn.evaluate(X_test, y_test)
 
-    # ── CNN + XGBoost 分类器 ─────────────────────────────────────────────
-    if bohb_trials > 0:
-        fedpcnn.train_svm_bohb(X_train, y_train, n_trials=bohb_trials, checkpoint_tag=ckpt_tag)
-    else:
-        fedpcnn.train_svm(X_train, y_train)
+    # CNN + SVM 分类器（论文：CNN-SVM架构）
+    fedpcnn.train_svm(X_train, y_train)
+    metrics_svm, svm_preds, svm_labels = fedpcnn.evaluate_with_svm(X_test, y_test)
 
-    # 多分类门限搜索：在验证集上搜索最优 Normal 门限以降低 FAR
-    normal_threshold = None
-    if n_classes > 2:
-        normal_threshold = fedpcnn.search_normal_threshold(X_val, y_val)
-
-    # XGBoost 评估（无门限 baseline + 有门限）
-    metrics_xgb_raw, _, _ = fedpcnn.evaluate_with_svm(X_test, y_test)
-    print(f"  XGBoost (无门限): Acc={metrics_xgb_raw['Accuracy']:.2f}%, "
-          f"Macro-F1={metrics_xgb_raw['Macro-F1']:.2f}%, FAR={metrics_xgb_raw['FAR']:.2f}%")
-
-    if normal_threshold is not None:
-        metrics_xgb, xgb_preds, xgb_labels = fedpcnn.evaluate_with_svm(
-            X_test, y_test, normal_threshold=normal_threshold)
-        print(f"  XGBoost (门限={normal_threshold:.2f}): Acc={metrics_xgb['Accuracy']:.2f}%, "
-              f"Macro-F1={metrics_xgb['Macro-F1']:.2f}%, FAR={metrics_xgb['FAR']:.2f}%")
-    else:
-        metrics_xgb, xgb_preds, xgb_labels = metrics_xgb_raw, None, None
-        # 二分类无门限，重新获取 preds/labels
-        metrics_xgb, xgb_preds, xgb_labels = fedpcnn.evaluate_with_svm(X_test, y_test)
-
-    # 自动选择更优路径
-    cnn_f1 = metrics_cnn.get('Macro-F1', 0)
-    xgb_f1 = metrics_xgb.get('Macro-F1', 0)
-    if cnn_f1 > xgb_f1:
+    # 选择更优结果
+    cnn_f1 = metrics_cnn.get('Macro-F1', metrics_cnn.get('F1-Score', 0))
+    svm_f1 = metrics_svm.get('Macro-F1', metrics_svm.get('F1-Score', 0))
+    if cnn_f1 > svm_f1:
         metrics = metrics_cnn
-        best_path = "CNN(校准)" if use_logit_cal else "CNN"
+        best_path = "CNN"
     else:
-        metrics = metrics_xgb
-        best_path = f"CNN+XGBoost(门限={normal_threshold:.2f})" if normal_threshold else "CNN+XGBoost"
-    print(f"\n  最终选择: {best_path} (Macro-F1: CNN={cnn_f1:.2f}% vs XGBoost={xgb_f1:.2f}%)")
+        metrics = metrics_svm
+        best_path = "CNN+SVM"
+    print(f"\n  最终选择: {best_path} (F1: CNN={cnn_f1:.2f}% vs SVM={svm_f1:.2f}%)")
 
-    # ── 评估完成，立即保存结果和完整模型权重 ─────────────────────────────
-    # 保存结果（使用更优路径的指标）
-    save_params = {
-        'num_devices': num_devices,
-        'global_rounds': global_rounds,
-        'local_epochs': hp_local_epochs,
-        'batch_size': 256,
-        'lr': hp_lr,
-        'classifier': best_path,
-    }
-    # 保存 BOHB 最优超参数
-    if hasattr(fedpcnn, 'bohb_best_params'):
-        save_params['bohb_best_params'] = fedpcnn.bohb_best_params
-        save_params['bohb_best_cv_f1'] = round(fedpcnn.bohb_best_score * 100, 2)
+    # 保存结果
     logger.save_result(
         dataset=dataset_name,
         model_name='fedpcnn',
         partition=partition_type,
         alpha=alpha,
         metrics=metrics,
-        params=save_params,
+        params={
+            'num_devices': num_devices,
+            'global_rounds': global_rounds,
+            'local_epochs': hp_local_epochs,
+            'batch_size': 64,
+            'lr': hp_lr,
+            'mu': hp_mu,
+            'classifier': best_path,
+        },
         classification=classification
     )
-    print(f"\n实验结果已保存（评估阶段）")
 
-    # 更新模型权重（含评估结果和分类器）
-    model_state['best_path'] = best_path
-    model_state['metrics'] = metrics
-    if hasattr(fedpcnn, 'svm_classifier') and fedpcnn.svm_classifier is not None:
-        model_state['xgb_classifier'] = fedpcnn.svm_classifier
-    if hasattr(fedpcnn, 'bohb_best_params'):
-        model_state['bohb_best_params'] = fedpcnn.bohb_best_params
-        model_state['bohb_best_cv_f1'] = fedpcnn.bohb_best_score
-    if logit_bias is not None:
-        model_state['logit_bias'] = logit_bias
-    _torch.save(model_state, model_path)
-    print(f"模型权重已更新（含评估结果）: {model_path}")
-
-    # ── 可视化（失败不影响已保存的结果） ────────────────────────────────────
+    # 可视化
     try:
-        # 1. 损失曲线（含验证）
         plot_loss_curves(
-            train_loss=train_loss,
-            val_loss=val_loss,
-            train_label="train_loss",
-            val_label="val_loss", #local中CE交叉熵损失
+            train_loss=train_loss, val_loss=val_loss,
+            train_label="train_loss", val_label="val_loss",
             title=f"训练损失({dataset_name} · {partition_type.upper()} · {classification})",
             save_path=f"./results/plots/{tag}_loss.png",
         )
-
-        # 2. 混淆矩阵
-        plot_confusion_matrix(
-            y_true=xgb_labels,
-            y_pred=np.array(xgb_preds),
-            class_names=class_names,
-            title=f"混淆矩阵({dataset_name} · {partition_type.upper()} · {classification})",
-            save_path=f"./results/plots/{tag}_cm.png",
-        )
-
-        # 3. 单模型指标对比图
-        if metrics:
-            plot_model_comparison(
-                results={f"FedPCNN ({partition_type.upper()} · {classification})": metrics},
-                metrics=['Accuracy', 'Precision', 'Recall', 'F1-Score', 'FAR'],
-                title=f"FedPCNN  ({dataset_name} · {classification})",
-                save_path=f"./results/plots/{tag}_metrics.png",
-            )
-
-        # 4. 逐类别指标水平条形图（论文风格）
-        plot_per_class_metrics(
-            y_true=xgb_labels,
-            y_pred=np.array(xgb_preds),
-            class_names=class_names,
-            title=f"逐类别性能({dataset_name} · {partition_type.upper()} · {classification})",
-            save_path=f"./results/plots/{tag}_per_class.png",
-        )
-
-        # 5. 模型对比水平条形图（论文风格，预留多模型对比）
-        if metrics:
-            plot_model_comparison_horizontal(
-                results={'FedPCNN': {
-                    'Accuracy': metrics.get('Accuracy', 0),
-                    'Precision': metrics.get('Macro-Precision', metrics.get('Precision', 0)),
-                    'Recall': metrics.get('Macro-Recall', metrics.get('Recall', 0)),
-                    'F1-Score': metrics.get('Macro-F1', metrics.get('F1-Score', 0)),
-                }},
-                metrics=['Accuracy', 'Precision', 'Recall', 'F1-Score'],
-                title=f"模型性能对比({dataset_name} · {classification})",
-                save_path=f"./results/plots/{tag}_comparison.png",
+        if svm_preds is not None:
+            plot_confusion_matrix(
+                y_true=svm_labels, y_pred=np.array(svm_preds),
+                class_names=class_names,
+                title=f"混淆矩阵({dataset_name} · {partition_type.upper()} · {classification})",
+                save_path=f"./results/plots/{tag}_cm.png",
             )
     except Exception as plot_err:
-        print(f"\n绘图失败（结果已保存，不影响实验）: {plot_err}")
+        print(f"\n绘图失败（结果已保存）: {plot_err}")
 
     # 结果总结
     print("\n" + "=" * 60)
@@ -415,18 +272,6 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         for k, v in metrics.items():
             print(f"  {k}: {v:.2f}%")
     print("=" * 60)
-    print("\n实验完成!")
-
-    # ── 统一清理所有 checkpoint ──
-    ckpt_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'checkpoints')
-    for pat in [f'{ckpt_tag}_fl.pt', f'{ckpt_tag}_bohb.db']:
-        fp = os.path.join(ckpt_dir, pat)
-        if os.path.exists(fp):
-            try:
-                os.remove(fp)
-                print(f"  已清理 checkpoint: {fp}")
-            except PermissionError:
-                print(f"  警告: 无法删除 checkpoint (文件被占用): {fp}")
 
     return metrics
 

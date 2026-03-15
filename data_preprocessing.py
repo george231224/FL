@@ -158,7 +158,7 @@ class NSLKDDPreprocessor:
         self.classification = classification
         self.test_size = test_size
         self.seed = seed
-        self.scaler = RobustScaler(quantile_range=(10, 90))  # MinMaxScaler→RobustScaler: 对网络流量极端离群值更稳健
+        self.scaler = MinMaxScaler()  # 论文：标准化+归一化
         self.label_encoder = LabelEncoder()
         self.feature_names = self._get_feature_names()
 
@@ -212,16 +212,14 @@ class NSLKDDPreprocessor:
         train_df.columns = self.feature_names + ['label', 'difficulty']
         test_df.columns  = self.feature_names + ['label', 'difficulty']
 
-        # 合并两个文件，统一重新划分（保证训练/测试同分布）
-        df = pd.concat([train_df, test_df], ignore_index=True)
-        print(f"\n合并数据量: {len(df):,} 行 (KDDTrain+: {len(train_df):,}, KDDTest+: {len(test_df):,})")
+        # 论文标准划分: KDDTrain+ 作为训练集, KDDTest+ 作为测试集
+        print(f"\n标准划分: KDDTrain+ {len(train_df):,} 行, KDDTest+ {len(test_df):,} 行")
 
-        # One-Hot 编码（在合并数据上统一编码，自动覆盖所有 service/flag 取值）
+        # One-Hot 编码（在合并数据上统一编码，确保列对齐）
         categorical_cols = ['protocol_type', 'service', 'flag']
-        print(f"使用 One-Hot 编码处理分类特征: {categorical_cols}")
-        print(f"原始特征维度: {len(self.feature_names)}")
-
+        df = pd.concat([train_df, test_df], ignore_index=True)
         X_all = pd.get_dummies(df[self.feature_names].copy(), columns=categorical_cols)
+        n_train = len(train_df)
         print(f"One-Hot 编码后特征维度: {len(X_all.columns)}")
         print(f"分类模式: {'二分类 (Normal/Attack)' if self.classification == 'binary' else '多分类 (Normal/DoS/Probe/R2L/U2R)'}")
 
@@ -240,17 +238,19 @@ class NSLKDDPreprocessor:
             self.label_encoder.classes_ = np.array(['normal', 'dos', 'probe', 'r2l', 'u2r'])
             y_all = pd.Series(y_str).map(int_map).fillna(0).values.astype(int)
 
-        # 分层划分，保证训练集与测试集类别比例一致
+        # 标准划分: KDDTrain+ / KDDTest+
         X_arr = X_all.values.astype(float)
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_arr, y_all,
-            test_size=self.test_size,
-            random_state=self.seed,
-            stratify=y_all
-        )
-        print(f"分层划分完成: 训练+验证 {len(y_train):,}  测试 {len(y_test):,}")
+        X_train = X_arr[:n_train]
+        X_test  = X_arr[n_train:]
+        y_train = y_all[:n_train]
+        y_test  = y_all[n_train:]
+        print(f"标准划分完成: 训练集 {len(y_train):,}  测试集 {len(y_test):,}")
 
-        # 归一化：仅在训练集上 fit，避免数据泄露
+        # 标准化 + 归一化：仅在训练集上 fit
+        from sklearn.preprocessing import StandardScaler
+        std_scaler = StandardScaler()
+        X_train = std_scaler.fit_transform(X_train)
+        X_test  = std_scaler.transform(X_test)
         X_train = self.scaler.fit_transform(X_train)
         X_test  = self.scaler.transform(X_test)
 
@@ -289,16 +289,20 @@ class UNSWNB15Preprocessor:
         self.test_size = test_size
         self.seed = seed
         self.label_encoder = LabelEncoder()
+        self.scaler = MinMaxScaler()  # 论文：标准化+归一化
 
     def load_and_preprocess(self):
         train_df = pd.read_csv(f'{self.data_dir}/UNSW_NB15/UNSW_NB15_training-set.csv')
         test_df  = pd.read_csv(f'{self.data_dir}/UNSW_NB15/UNSW_NB15_testing-set.csv')
 
-        # 合并两个文件，统一重新划分（保证训练/测试同分布）
-        df = pd.concat([train_df, test_df], ignore_index=True)
-        print(f"\n合并数据量: {len(df):,} 行 (training-set: {len(train_df):,}, testing-set: {len(test_df):,})")
+        # 论文标准划分: training-set 作为训练集, testing-set 作为测试集
+        print(f"\n标准划分: training-set {len(train_df):,} 行, testing-set {len(test_df):,} 行")
 
-        # 标签提取（在 drop 特征列之前）
+        # 合并用于统一编码，但最终按原始划分
+        df = pd.concat([train_df, test_df], ignore_index=True)
+        n_train = len(train_df)
+
+        # 标签提取
         if self.classification == 'binary':
             y_all = df['label'].values.astype(int)
             self.label_encoder.classes_ = np.array(['normal', 'attack'])
@@ -323,76 +327,44 @@ class UNSWNB15Preprocessor:
                 'reconnaissance', 'shellcode', 'worms'
             ])
 
-        # 删除 id、label、attack_cat 及低信息量列
-        # ct_ftp_cmd 含空白非数字条目，is_ftp_login 几乎全为0，ct_flw_http_mthd 大量空值
-        drop_cols = ['id', 'label', 'attack_cat',
-                     'ct_ftp_cmd', 'is_ftp_login', 'ct_flw_http_mthd']
+        # 删除 id、label、attack_cat 列
+        drop_cols = ['id', 'label', 'attack_cat']
         X_all = df.drop(columns=drop_cols, errors='ignore')
 
-        # 清洗 NaN / Inf（网络流量数据常见异常值）
+        # 清洗 NaN / Inf
         X_all = X_all.replace([np.inf, -np.inf], np.nan)
         X_all = X_all.fillna(0)
 
-        print(f"原始特征维度: {len(X_all.columns)} (含类别列 proto/service/state)")
+        # One-Hot 编码分类特征（论文：独热编码）
+        categorical_cols = [c for c in ['proto', 'service', 'state'] if c in X_all.columns]
+        print(f"原始特征维度: {len(X_all.columns)} (含类别列 {categorical_cols})")
         print(f"分类模式: {'二分类 (Normal/Attack)' if self.classification == 'binary' else '多分类 (Normal + 9种攻击)'}")
 
-        # 分层划分（在原始 DataFrame 上，保留列名用于 MRMR）
-        categorical_cols = [c for c in ['proto', 'service', 'state'] if c in X_all.columns]
-        train_idx, test_idx = train_test_split(
-            np.arange(len(y_all)),
-            test_size=self.test_size,
-            random_state=self.seed,
-            stratify=y_all
-        )
-        X_train_df = X_all.iloc[train_idx].reset_index(drop=True)
-        X_test_df  = X_all.iloc[test_idx].reset_index(drop=True)
-        y_train = y_all[train_idx]
-        y_test  = y_all[test_idx]
-        print(f"分层划分完成: 训练+验证 {len(y_train):,}  测试 {len(y_test):,}")
+        # 处理非数值列：ct_ftp_cmd, is_ftp_login, ct_flw_http_mthd 可能含非数字
+        for col in X_all.columns:
+            if col not in categorical_cols:
+                X_all[col] = pd.to_numeric(X_all[col], errors='coerce').fillna(0)
 
-        # MRMR 特征选择：top-20 硬截断（实验验证为最优截断点）
-        selected_cols = mrmr_feature_selection(
-            X_train_df, y_train,
-            categorical_cols=categorical_cols,
-            n_bins=15,
-            top_k=20
-        )
-        self.selected_feature_names_ = selected_cols
+        X_all = pd.get_dummies(X_all, columns=categorical_cols)
+        print(f"One-Hot 编码后特征维度: {len(X_all.columns)}")
 
-        # 仅保留选中的列
-        X_train_df = X_train_df[selected_cols]
-        X_test_df  = X_test_df[selected_cols]
+        # 标准划分
+        X_arr = X_all.values.astype(float)
+        X_train = X_arr[:n_train]
+        X_test  = X_arr[n_train:]
+        y_train = y_all[:n_train]
+        y_test  = y_all[n_train:]
+        print(f"标准划分完成: 训练集 {len(y_train):,}  测试集 {len(y_test):,}")
 
-        # 分类特征 → LabelEncoding（不做 OneHot，贴近论文）
-        # 连续特征 → RobustScaler
-        selected_cat_cols = [c for c in categorical_cols if c in selected_cols]
-        selected_num_cols = [c for c in selected_cols if c not in selected_cat_cols]
+        # 标准化 + 归一化
+        from sklearn.preprocessing import StandardScaler
+        std_scaler = StandardScaler()
+        X_train = std_scaler.fit_transform(X_train)
+        X_test  = std_scaler.transform(X_test)
+        X_train = self.scaler.fit_transform(X_train)
+        X_test  = self.scaler.transform(X_test)
 
-        # LabelEncoding: 分类特征转为整数编码
-        self._label_encoders = {}
-        for col in selected_cat_cols:
-            le = LabelEncoder()
-            X_train_df[col] = le.fit_transform(X_train_df[col].astype(str))
-            X_test_df[col] = X_test_df[col].astype(str).map(
-                lambda x, le=le: le.transform([x])[0] if x in le.classes_ else 0
-            )
-            self._label_encoders[col] = le
-
-        # ColumnTransformer: 全部用 RobustScaler（LabelEncoded 列也做缩放）
-        ct = ColumnTransformer(transformers=[
-            ('num', RobustScaler(quantile_range=(10, 90)), selected_cols),
-        ])
-        X_train = ct.fit_transform(X_train_df)
-        X_test  = ct.transform(X_test_df)
-        self.column_transformer_ = ct
-        self.n_continuous_ = len(selected_cols)  # 全部特征都是数值型
-
-        # 打印维度信息
-        print(f"\n[预处理] LabelEncoding + RobustScaler (无 OneHot)")
-        print(f"  连续特征: {len(selected_num_cols)} 列")
-        if selected_cat_cols:
-            print(f"  类别特征: {selected_cat_cols} → LabelEncoding")
-        print(f"  最终特征维度: {X_train.shape[1]}")
+        print(f"最终特征维度: {X_train.shape[1]}")
 
         # 打印类别分布
         class_names = self.label_encoder.classes_
