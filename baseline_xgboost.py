@@ -7,8 +7,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
+import torch
 
 from data_preprocessing import UNSWNB15Preprocessor
+
+def _xgb_tree_method():
+    return 'gpu_hist' if torch.cuda.is_available() else 'hist'
 
 # ── 1. 加载数据（与 main.py 完全一致的预处理流程）──
 print("=" * 60)
@@ -48,7 +52,7 @@ model = XGBClassifier(
     reg_lambda=10,
     objective='multi:softprob',
     num_class=n_classes,
-    tree_method='gpu_hist',
+    tree_method=_xgb_tree_method(),
     eval_metric='mlogloss',
     random_state=42,
     verbosity=1,

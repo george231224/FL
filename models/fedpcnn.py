@@ -12,6 +12,17 @@ from copy import deepcopy
 import warnings
 warnings.filterwarnings('ignore')
 
+
+def _xgb_tree_method():
+    """Auto-detect best XGBoost tree_method: gpu_hist if CUDA available, else hist."""
+    try:
+        import torch as _t
+        if _t.cuda.is_available():
+            return 'gpu_hist'
+    except Exception:
+        pass
+    return 'hist'
+
 # 断点续训 checkpoint 目录
 CHECKPOINT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'checkpoints')
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
@@ -1089,7 +1100,7 @@ class FedPCNN:
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
                 objective='multi:softprob', num_class=n_classes,
-                tree_method='gpu_hist', random_state=42, n_jobs=-1, verbosity=0,
+                tree_method=_xgb_tree_method(), random_state=42, n_jobs=-1, verbosity=0,
             ),
         }
 
@@ -1145,7 +1156,7 @@ class FedPCNN:
             n_estimators=200, max_depth=4, learning_rate=0.1,
             subsample=0.8, colsample_bytree=0.8, min_child_weight=3,
             objective='multi:softprob', num_class=n_classes,
-            tree_method='gpu_hist', random_state=42, n_jobs=-1, verbosity=0,
+            tree_method=_xgb_tree_method(), random_state=42, n_jobs=-1, verbosity=0,
         )
         meta_weights = compute_sample_weight('balanced', labels)
         self.svm_classifier.fit(meta_features, labels, sample_weight=meta_weights)
@@ -1205,7 +1216,7 @@ class FedPCNN:
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
                 objective='multi:softprob', num_class=n_classes,
-                tree_method='gpu_hist', random_state=42, n_jobs=-1, verbosity=0,
+                tree_method=_xgb_tree_method(), random_state=42, n_jobs=-1, verbosity=0,
             ),
         }
 
@@ -1264,7 +1275,7 @@ class FedPCNN:
                 'reg_lambda': trial.suggest_float('reg_lambda', 1e-3, 10.0, log=True),
                 'objective': 'multi:softprob',
                 'num_class': num_classes,
-                'tree_method': 'gpu_hist',
+                'tree_method': _xgb_tree_method(),
                 'random_state': 42,
                 'n_jobs': -1,
                 'verbosity': 0,
@@ -1328,7 +1339,7 @@ class FedPCNN:
         best.update({
             'objective': 'multi:softprob',
             'num_class': num_classes,
-            'tree_method': 'gpu_hist',
+            'tree_method': _xgb_tree_method(),
             'random_state': 42,
             'n_jobs': -1,
             'verbosity': 0,

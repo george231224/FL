@@ -637,6 +637,9 @@ def apply_smote_per_client(client_data, num_classes, dataset_name='NSL-KDD',
     if classification == 'binary':
         # 二分类：少数类(Attack=1)过采样到多数类(Normal=0)的80%
         multipliers = None  # 使用通用逻辑（自动检测少数类并过采样）
+    elif dataset_name == 'CIC-IDS2017' and num_classes == 7:
+        # CIC-IDS2017 多分类: WebAttacks(5) 和 Bots(6) 是极少数类
+        multipliers = {5: 8, 6: 10}
     elif dataset_name == 'NSL-KDD' and num_classes == 5:
         multipliers = {3: 3, 4: 15}
     elif dataset_name == 'UNSW-NB15' and num_classes == 10:

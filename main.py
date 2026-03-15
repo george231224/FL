@@ -171,23 +171,29 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
 
     # ── 按数据集分开配置 ──────────────────────────────────────────────────
     is_unsw = dataset_name.upper().startswith('UNSW')
+    is_cicids = dataset_name.upper().startswith('CIC')
 
-    if is_unsw:
-        # UNSW-NB15: 启用SMOTE处理类别不平衡
-        use_smote = True
-        use_crt = True
-        use_logit_cal = True
+    # ── 按数据集 + 分类模式分开配置超参数 ─────────────────────────────────
+    use_smote = True
+    use_crt = True
+    use_logit_cal = True
+
+    if is_cicids:
+        # CIC-IDS2017: 数据量大，类别相对均衡（二分类接近 80:20）
         if n_classes == 2:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.01, 0.1, 10, 0.6, 0.0
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.05, 8, 0.5, 0.0
+        else:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.5, 1.0
+    elif is_unsw:
+        # UNSW-NB15: 启用SMOTE处理类别不平衡
+        if n_classes == 2:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.08, 8, 0.5, 0.0
         else:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.3, 1.5
     else:
         # NSL-KDD: 保留原有最优配置
-        use_smote = True
-        use_crt = True
-        use_logit_cal = True
         if n_classes == 2:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.01, 0.1, 10, 0.6, 0.0
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.08, 8, 0.5, 0.0
         else:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.6, 1.5
 
@@ -840,6 +846,19 @@ def run_segmented_fl(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, de
         k_neighbors=5,
     )
 
+    # ── 按数据集配置 Segmented FL 超参数 ──────────────────────────────────
+    is_cicids_seg = dataset_name.upper().startswith('CIC')
+    is_unsw_seg = dataset_name.upper().startswith('UNSW')
+    if is_cicids_seg:
+        seg_lr, seg_mu, seg_threshold = 0.0008, 0.01, 0.45
+        seg_focal_gamma = 1.0 if classification == 'multi' else 2.0
+    elif is_unsw_seg:
+        seg_lr, seg_mu, seg_threshold = 0.001, 0.01, 0.45
+        seg_focal_gamma = 1.5 if classification == 'multi' else 2.0
+    else:  # NSL-KDD
+        seg_lr, seg_mu, seg_threshold = 0.001, 0.01, 0.45
+        seg_focal_gamma = 1.5 if classification == 'multi' else 2.0
+
     train_loss, val_loss = model.train(
         client_data=client_data_list,
         X_val=X_val,
@@ -848,12 +867,12 @@ def run_segmented_fl(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, de
         local_epochs=local_epochs,
         client_fraction=0.5,
         batch_size=256,
-        lr=0.001,
-        mu=0.01,
+        lr=seg_lr,
+        mu=seg_mu,
         gamma=0.1,
         eval_interval=5,
-        threshold=0.45,
-        focal_gamma=1.5 if classification == 'multi' else 2.0,
+        threshold=seg_threshold,
+        focal_gamma=seg_focal_gamma,
         pre_smote_class_weights=pre_smote_class_weights,
     )
 
@@ -952,7 +971,7 @@ if __name__ == '__main__':
                         help='随机种子（不指定则每次随机）')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='禁用CUDA（即使可用）')
-    parser.add_argument('--global-rounds', type=int, default=50,
+    parser.add_argument('--global-rounds', type=int, default=60,
                         help='全局训练轮次（降低lr后需更多轮次收敛）')
     parser.add_argument('--local-epochs', type=int, default=5,
                         help='本地训练轮次')

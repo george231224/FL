@@ -26,5 +26,8 @@ seaborn==0.13.2
 # 进度条
 tqdm==4.67.1
 
+# 过采样
+imbalanced-learn==0.12.4
+
 # 数据集下载
 requests==2.32.4
