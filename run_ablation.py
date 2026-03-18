@@ -49,7 +49,8 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
     ).astype(float)
     pre_smote_cw = 1.0 / pre_smote_counts
     min_cw = pre_smote_cw.min()
-    pre_smote_cw = np.clip(pre_smote_cw, 0, min_cw * 15.0)
+    cw_cap = 50.0 if n_classes > 5 else 15.0  # 与 main.py 对齐
+    pre_smote_cw = np.clip(pre_smote_cw, 0, min_cw * cw_cap)
     pre_smote_cw = pre_smote_cw / pre_smote_cw.sum() * n_classes
     pre_smote_class_weights = torch.FloatTensor(pre_smote_cw)
 
@@ -72,12 +73,22 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
     fedpcnn.device = device
 
     # 超参数（与 main.py 对齐）
-    if n_classes == 2:
-        hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.01, 0.1, 10, 0.6  # 二分类不变
-    elif n_classes <= 5:
-        hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.005, 0.05, 5, 0.6  # 与main.py对齐
-    else:
-        hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.005, 0.05, 5, 0.6  # gamma 0.4→0.6
+    # 超参数与 main.py 严格对齐
+    if dataset_name.upper().startswith('UNSW'):
+        if n_classes == 2:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.008, 0.08, 8, 0.5
+        else:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.005, 0.10, 5, 0.5
+    elif dataset_name.upper().startswith('CIC'):
+        if n_classes == 2:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.008, 0.05, 8, 0.5
+        else:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.005, 0.05, 5, 0.5
+    else:  # NSL-KDD
+        if n_classes == 2:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.008, 0.08, 8, 0.5
+        else:
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.005, 0.05, 5, 0.6
 
     # [额外修复] 使用新的 dynamic_aggregation 参数（原来传 dynamic_aggregation 到旧接口会报错）
     train_loss, val_loss = fedpcnn.train(
@@ -85,7 +96,7 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
         global_rounds=global_rounds,
         local_epochs=hp_local_epochs,
         client_fraction=1.0 if (partition_type != 'iid' or n_classes == 2) else 0.7,
-        batch_size=64,
+        batch_size=256,  # 与 main.py 对齐
         lr=hp_lr, mu=hp_mu, gamma=hp_gamma,
         focal_gamma=focal_gamma,
         alpha=alpha,

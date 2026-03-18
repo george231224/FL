@@ -1578,7 +1578,7 @@ class FedPCNN:
 
         # [修改2] 先计算无门限 baseline FAR（纯 argmax）
         baseline_preds = proba.argmax(axis=1)
-        cm_base = confusion_matrix(labels, baseline_preds)
+        cm_base = confusion_matrix(labels, baseline_preds, labels=list(range(self.num_classes)))
         normal_total_base = cm_base[0, :].sum()
         attack_total_base = cm_base[1:, :].sum()
         fpr_base = cm_base[0, 1:].sum() / normal_total_base if normal_total_base > 0 else 0.0
@@ -1598,7 +1598,7 @@ class FedPCNN:
             preds = np.where(proba[:, 0] >= t, 0, proba[:, 1:].argmax(axis=1) + 1)
             macro_f1 = f1_score(labels, preds, average='macro', zero_division=0) * 100
             acc = 100 * (preds == labels).mean()
-            cm = confusion_matrix(labels, preds)
+            cm = confusion_matrix(labels, preds, labels=list(range(self.num_classes)))
             normal_total = cm[0, :].sum()
             attack_total = cm[1:, :].sum()
             fpr = cm[0, 1:].sum() / normal_total if normal_total > 0 else 0.0
