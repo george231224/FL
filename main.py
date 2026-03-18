@@ -210,6 +210,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         pre_smote_cw = np.clip(pre_smote_cw, 0, min_cw * cw_cap)
         pre_smote_cw = pre_smote_cw / pre_smote_cw.sum() * n_classes
         pre_smote_class_weights = torch.FloatTensor(pre_smote_cw)
+        # Store raw counts for BalancedSoftmaxLoss (NOT weights)
+        fedpcnn._class_counts = torch.FloatTensor(pre_smote_counts)
 
         # Non-IID 场景：取消SMOTE预热，从第1轮直接用SMOTE数据，避免切换震荡
         if partition_type == 'non-iid':

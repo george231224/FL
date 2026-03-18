@@ -180,15 +180,27 @@ class FocalLoss(nn.Module):
 
 class BalancedSoftmaxLoss(nn.Module):
     """Balanced Softmax Loss for long-tailed recognition.
-    Adjusts logits by log class prior before cross-entropy.
+    Adjusts logits by log(class_count / total) before cross-entropy.
+    
+    Args:
+        cls_counts: raw class counts (NOT inverse-frequency weights)
+                    e.g. [93000, 2677, 2329, 16353, ...] for UNSW-NB15
+        label_smoothing: label smoothing factor
     """
     def __init__(self, cls_counts, label_smoothing=0.0):
         super().__init__()
-        prior = torch.tensor(cls_counts, dtype=torch.float32)
-        self.register_buffer('log_prior', torch.log(prior / prior.sum() + 1e-12))
+        if isinstance(cls_counts, torch.Tensor):
+            counts = cls_counts.float()
+        else:
+            counts = torch.tensor(cls_counts, dtype=torch.float32)
+        # log prior = log(n_k / N), will be added to logits
+        self.register_buffer('log_prior', torch.log(counts / counts.sum() + 1e-12))
         self.label_smoothing = label_smoothing
 
     def forward(self, logits, target):
+        # Move log_prior to same device as logits (handles CPU/CUDA mismatch)
+        if self.log_prior.device != logits.device:
+            self.log_prior = self.log_prior.to(logits.device)
         adjusted = logits + self.log_prior.unsqueeze(0)
         return F.cross_entropy(adjusted, target, label_smoothing=self.label_smoothing)
 
@@ -340,10 +352,10 @@ class FedPCNN:
             cw_tensor = torch.FloatTensor(cw).to(self.device)
 
         # 损失函数：多分类(>5类)用 BalancedSoftmax；二分类/少类用 FocalLoss/CE
-        if self.num_classes > 5:
+        if self.num_classes > 5 and hasattr(self, '_class_counts'):
             # 长尾多分类：BalancedSoftmax (class-prior logit correction)
-            # cw_tensor 包含类别频率信息，转为 counts
-            criterion = BalancedSoftmaxLoss(cw_tensor, label_smoothing=0.05)
+            # 使用原始类别计数，NOT inverse-frequency weights
+            criterion = BalancedSoftmaxLoss(self._class_counts, label_smoothing=0.05)
         elif focal_gamma > 0:
             ls = 0.05
             criterion = FocalLoss(alpha=cw_tensor, gamma=focal_gamma, label_smoothing=ls)
@@ -608,8 +620,10 @@ class FedPCNN:
         patience = 15
         best_weights = None
 
-        # 构建评估用损失函数（与训练一致的 FocalLoss，确保 train/val loss 量纲统一）
-        if focal_gamma > 0:
+        # 构建评估用损失函数（与训练一致，确保 train/val loss 量纲统一）
+        if self.num_classes > 5 and hasattr(self, '_class_counts'):
+            eval_criterion = BalancedSoftmaxLoss(self._class_counts, label_smoothing=0.05)
+        elif focal_gamma > 0:
             ls = 0.1 if self.num_classes > 5 else 0.05
             eval_criterion = FocalLoss(alpha=global_class_weights, gamma=focal_gamma,
                                        label_smoothing=ls, reduction='mean')
