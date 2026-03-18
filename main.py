@@ -497,6 +497,8 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
     pre_s1_cw = pre_s1_cw / pre_s1_cw.sum() * 2
     pre_s1_class_weights = torch.FloatTensor(pre_s1_cw)
 
+    # Save raw data BEFORE SMOTE for warmup
+    client_data_s1_raw_presave = list(client_data_s1_list)
     # SMOTE (binary)
     client_data_s1_list = apply_smote_per_client(
         client_data_s1_list, num_classes=2,
@@ -515,7 +517,7 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
     client_data_s1_raw = None
     s1_warmup = 0
     if partition_type == 'non-iid':
-        client_data_s1_raw = list(client_data_s1_list)
+        client_data_s1_raw = client_data_s1_raw_presave
         s1_warmup = 5
 
     print(f"\n  Stage1 超参数: lr={s1_lr}, mu={s1_mu}, local_epochs={s1_epochs}, "

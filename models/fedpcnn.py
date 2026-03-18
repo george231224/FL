@@ -1303,7 +1303,7 @@ class FedPCNN:
                 'reg_lambda': trial.suggest_float('reg_lambda', 1e-3, 10.0, log=True),
                 'objective': 'multi:softprob',
                 'num_class': num_classes,
-                'tree_method': 'hist', 'device': 'cuda',
+                'tree_method': 'hist', 'device': 'cuda' if torch.cuda.is_available() else 'cpu',
                 'random_state': 42,
                 'n_jobs': -1,
                 'verbosity': 0,
@@ -1367,7 +1367,7 @@ class FedPCNN:
         best.update({
             'objective': 'multi:softprob',
             'num_class': num_classes,
-            'tree_method': 'hist', 'device': 'cuda',
+            'tree_method': 'hist', 'device': 'cuda' if torch.cuda.is_available() else 'cpu',
             'random_state': 42,
             'n_jobs': -1,
             'verbosity': 0,

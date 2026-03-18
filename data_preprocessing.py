@@ -573,7 +573,7 @@ def partition_non_iid(X, y, num_clients, alpha=0.5, seed=42):
     client_indices = [[] for _ in range(num_clients)]
 
     # 保底：每个客户端每个类至少分到该类总量的5%（最少5个）
-    min_per_class = 5  # will be adjusted per class below
+    min_per_class = 2  # keep small to preserve Non-IID heterogeneity
 
     for c in classes:
         c_indices = np.where(y == c)[0]
