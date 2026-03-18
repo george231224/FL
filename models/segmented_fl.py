@@ -110,9 +110,9 @@ class SegmentedFederatedLearning:
             y_seq = y
         else:
             X_seq, y_seq = [], []
-            for i in range(len(X) - self.sequence_length):
+            for i in range(len(X) - self.sequence_length + 1):
                 X_seq.append(X[i:i + self.sequence_length])
-                y_seq.append(y[i + self.sequence_length])
+                y_seq.append(y[i + self.sequence_length - 1])
             X_seq = np.array(X_seq)
             y_seq = np.array(y_seq)
 

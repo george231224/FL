@@ -189,7 +189,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         if n_classes == 2:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.08, 8, 0.5, 0.0
         else:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.3, 1.5
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.003, 0.15, 2, 0.5, 2.0
     else:
         # NSL-KDD: 保留原有最优配置
         if n_classes == 2:
@@ -206,7 +206,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
         pre_smote_cw = 1.0 / pre_smote_counts
         min_cw = pre_smote_cw.min()
-        cw_cap = 30.0 if n_classes > 5 else 15.0
+        cw_cap = 50.0 if n_classes > 5 else 15.0
         pre_smote_cw = np.clip(pre_smote_cw, 0, min_cw * cw_cap)
         pre_smote_cw = pre_smote_cw / pre_smote_cw.sum() * n_classes
         pre_smote_class_weights = torch.FloatTensor(pre_smote_cw)

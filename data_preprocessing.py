@@ -350,18 +350,19 @@ class UNSWNB15Preprocessor:
         y_test  = y_all[test_idx]
         print(f"分层划分完成: 训练+验证 {len(y_train):,}  测试 {len(y_test):,}")
 
-        # MRMR 特征选择：top-20 硬截断（实验验证为最优截断点）
+        # MRMR 特征选择：使用全部特征（top_k=None 则按阈值截断，保留更多信息量）
         selected_cols = mrmr_feature_selection(
             X_train_df, y_train,
             categorical_cols=categorical_cols,
             n_bins=15,
-            top_k=20
+            top_k=None,
+            threshold=0.95
         )
         self.selected_feature_names_ = selected_cols
 
-        # 仅保留选中的列
-        X_train_df = X_train_df[selected_cols]
-        X_test_df  = X_test_df[selected_cols]
+        # 仅保留选中的列（.copy() 避免 SettingWithCopyWarning 和视图问题）
+        X_train_df = X_train_df[selected_cols].copy()
+        X_test_df  = X_test_df[selected_cols].copy()
 
         # 分类特征 → LabelEncoding（不做 OneHot，贴近论文）
         # 连续特征 → RobustScaler
@@ -562,50 +563,43 @@ def partition_iid(X, y, num_clients, seed=42):
 
 def partition_non_iid(X, y, num_clients, alpha=0.5, seed=42):
     """
-    Non-IID 数据划分：Dirichlet(alpha) 分布
-    alpha 越小，各客户端的类别分布越不均衡（极端 Non-IID）
-    alpha 越大（→∞），趋近于 IID 均匀分布
-
-    参数:
-        X: 特征矩阵
-        y: 标签向量
-        num_clients: 客户端数量
-        alpha: Dirichlet 浓度参数 (0.1=极端Non-IID, 1.0=较均衡)
-        seed: 随机种子
+    Non-IID 数据划分：Dirichlet(alpha) + 保底分配
+    每个客户端保底获得每个类别至少 min_per_class 个样本，
+    剩余按 Dirichlet(alpha) 分配，确保 Non-IID 但不至于缺失类别。
     """
     np.random.seed(seed)
     classes = np.unique(y)
+    n_classes = len(classes)
     client_indices = [[] for _ in range(num_clients)]
+
+    # 保底：每个客户端每个类至少分到该类总量的5%（最少5个）
+    min_per_class = 5  # will be adjusted per class below
 
     for c in classes:
         c_indices = np.where(y == c)[0]
         np.random.shuffle(c_indices)
 
-        # 用 Dirichlet 分布决定每个客户端分得该类的比例
-        proportions = np.random.dirichlet(np.repeat(alpha, num_clients))
+        # 先分保底
+        guaranteed = max(min_per_class, len(c_indices) // (num_clients * 2))  # ~5% per client
+        ptr = 0
+        for client_id in range(num_clients):
+            if ptr + guaranteed <= len(c_indices):
+                client_indices[client_id].extend(c_indices[ptr:ptr+guaranteed].tolist())
+                ptr += guaranteed
 
-        # 按比例切分，保证每个客户端至少有 1 个样本
-        proportions = np.array([
-            p * (len(idx) < len(c_indices) // num_clients + 1)
-            for p, idx in zip(proportions, client_indices)
-        ])
-        # 重新归一化（防止全为 0）
-        if proportions.sum() == 0:
-            proportions = np.ones(num_clients) / num_clients
-        else:
-            proportions = proportions / proportions.sum()
-
-        split_points = (np.cumsum(proportions) * len(c_indices)).astype(int)[:-1]
-        splits = np.split(c_indices, split_points)
-
-        for client_id, split in enumerate(splits):
-            client_indices[client_id].extend(split.tolist())
+        # 剩余按 Dirichlet 分配
+        remaining = c_indices[ptr:]
+        if len(remaining) > 0:
+            proportions = np.random.dirichlet(np.repeat(alpha, num_clients))
+            split_points = (np.cumsum(proportions) * len(remaining)).astype(int)[:-1]
+            splits = np.split(remaining, split_points)
+            for client_id, split in enumerate(splits):
+                client_indices[client_id].extend(split.tolist())
 
     client_data = {}
     for i in range(num_clients):
         idx = np.array(client_indices[i], dtype=int)
         if len(idx) == 0:
-            # 保底：随机抽取少量样本
             idx = np.random.choice(len(y), max(1, len(y) // (num_clients * 10)))
         np.random.shuffle(idx)
         client_data[i] = (X[idx], y[idx])
@@ -702,7 +696,6 @@ def apply_smote_per_client(client_data, num_classes, dataset_name='NSL-KDD',
                 m_neighbors=m,
                 kind='borderline-1',
                 random_state=42,
-                n_jobs=1,
             )
             X_res, y_res = smote.fit_resample(X, y)
             method_used = 'Borderline-SMOTE'
@@ -714,7 +707,6 @@ def apply_smote_per_client(client_data, num_classes, dataset_name='NSL-KDD',
                     sampling_strategy=sampling_strategy,
                     k_neighbors=k,
                     random_state=42,
-                    n_jobs=1,
                 )
                 X_res, y_res = fallback.fit_resample(X, y)
                 method_used = 'SMOTE(回退)'

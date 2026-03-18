@@ -18,7 +18,7 @@ def _xgb_tree_method():
     try:
         import torch as _t
         if _t.cuda.is_available():
-            return 'gpu_hist'
+            return 'hist'
     except Exception:
         pass
     return 'hist'
@@ -61,31 +61,36 @@ class SRFCNNBlock1D(nn.Module):
 
 
 class CNNSVM(nn.Module):
-    """论文原始 5 层 CNN 结构:
-    Layer1: Conv1d + ReLU      — 提取局部特征
-    Layer2: MaxPool1d          — 降维防过拟合
-    Layer3: GlobalAvgPool1d    — 空间维度→一维全局特征
-    Layer4: Dense + ReLU + Dropout — 全连接防过拟合
-    Layer5: Dense (Softmax)    — 输出层
-    注: 原论文用 Conv2D，20 维表格数据用 1D 卷积等效
+    """论文 FedPCNN 3层CNN结构 (32→64→128):
+    Layer1: Conv1d(32) + GroupNorm + ReLU + MaxPool1d  — 浅层局部特征
+    Layer2: Conv1d(64) + GroupNorm + ReLU + MaxPool1d  — 中层模式特征
+    Layer3: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool1d — 深层语义特征
+    Layer4: Dense(256) + ReLU + Dropout — 全连接
+    Layer5: Dense(num_classes) — 输出层
+    注: 原论文用 Conv2D，表格数据用 1D 卷积等效
     """
-    FEATURE_DIM = 128  # CNN 输出特征维度（供外部引用）
+    FEATURE_DIM = 256  # CNN 输出特征维度（供外部引用）
 
     def __init__(self, input_channels=1, input_height=None, num_classes=2):
         super(CNNSVM, self).__init__()
 
-        # Layer1: Conv1d + ReLU
+        # Layer1: Conv1d(32) + GroupNorm + ReLU + MaxPool
         self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=3, padding=1)
-        self.bn1 = nn.GroupNorm(min(16, 64), 64)  # GroupNorm 适配联邦 Non-IID
+        self.bn1 = nn.GroupNorm(min(16, 64), 64)
 
-        # Layer2: MaxPool1d
+        # Layer2: Conv1d(64) + GroupNorm + ReLU + MaxPool
+        self.conv2 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.GroupNorm(min(16, 128), 128)
+
+        # Layer3: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool
+        self.conv3 = nn.Conv1d(128, 256, kernel_size=3, padding=1)
+        self.bn3 = nn.GroupNorm(min(16, 256), 256)
+
         self.maxpool = nn.MaxPool1d(kernel_size=2, stride=2)
-
-        # Layer3: GlobalAvgPool1d
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
         # Layer4: Dense + ReLU + Dropout
-        self.fc1 = nn.Linear(64, self.FEATURE_DIM)
+        self.fc1 = nn.Linear(256, self.FEATURE_DIM)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
 
@@ -93,24 +98,30 @@ class CNNSVM(nn.Module):
         self.fc2 = nn.Linear(self.FEATURE_DIM, num_classes)
 
     def forward(self, x, return_features=False):
-        x = self.relu(self.bn1(self.conv1(x)))     # Layer1: (N, 64, L)
-        x = self.maxpool(x)                         # Layer2: (N, 64, L//2)
-        x = self.global_avg_pool(x)                 # Layer3: (N, 64, 1)
-        x = x.view(x.size(0), -1)                  # (N, 64)
-        features = self.relu(self.fc1(x))            # Layer4: (N, 128)
+        x = self.relu(self.bn1(self.conv1(x)))     # (N, 32, L)
+        x = self.maxpool(x)                         # (N, 32, L//2)
+        x = self.relu(self.bn2(self.conv2(x)))     # (N, 64, L//2)
+        x = self.maxpool(x)                         # (N, 64, L//4)
+        x = self.relu(self.bn3(self.conv3(x)))     # (N, 128, L//4)
+        x = self.global_avg_pool(x)                 # (N, 128, 1)
+        x = x.view(x.size(0), -1)                  # (N, 256)
+        features = self.relu(self.fc1(x))            # (N, 256)
         x = self.dropout(features)
-        x = self.fc2(x)                             # Layer5: (N, num_classes)
+        x = self.fc2(x)                             # (N, num_classes)
 
         if return_features:
             return x, features
         return x
 
     def extract_features(self, x):
-        """提取 fc1 特征（128 维）"""
+        """提取 fc1 特征（256 维）"""
         with torch.no_grad():
             x = self.relu(self.bn1(self.conv1(x)))
             x = self.maxpool(x)
-            x = self.global_avg_pool(x).view(x.size(0), -1)
+            x = self.relu(self.bn2(self.conv2(x)))
+            x = self.maxpool(x)
+            x = self.relu(self.bn3(self.conv3(x)))
+            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 256)
             features = self.relu(self.fc1(x))
         return features
 
@@ -164,6 +175,22 @@ class FocalLoss(nn.Module):
             return focal_loss.sum()
         return focal_loss
 
+
+
+
+class BalancedSoftmaxLoss(nn.Module):
+    """Balanced Softmax Loss for long-tailed recognition.
+    Adjusts logits by log class prior before cross-entropy.
+    """
+    def __init__(self, cls_counts, label_smoothing=0.0):
+        super().__init__()
+        prior = torch.tensor(cls_counts, dtype=torch.float32)
+        self.register_buffer('log_prior', torch.log(prior / prior.sum() + 1e-12))
+        self.label_smoothing = label_smoothing
+
+    def forward(self, logits, target):
+        adjusted = logits + self.log_prior.unsqueeze(0)
+        return F.cross_entropy(adjusted, target, label_smoothing=self.label_smoothing)
 
 class CenterLoss(nn.Module):
     """Center Loss: 类内聚拢正则项
@@ -395,7 +422,7 @@ class FedPCNN:
                     ) ** 0.5
 
                 torch.nn.utils.clip_grad_norm_(local_model.parameters(),
-                                               max_norm=2.0 if self.num_classes > 5 else 1.0)
+                                               max_norm=1.0)
                 optimizer.step()
 
                 epoch_loss += base_loss.item()
@@ -571,7 +598,7 @@ class FedPCNN:
         # patience=5, eval_interval=5 → 5×5=25轮无改善即停（50轮内可触发）
         best_val_loss = float('inf')
         patience_counter = 0
-        patience = 7
+        patience = 15
         best_weights = None
 
         # 构建评估用损失函数（与训练一致的 FocalLoss，确保 train/val loss 量纲统一）
@@ -618,6 +645,7 @@ class FedPCNN:
         global_bar = tqdm(total=global_rounds, initial=start_round, desc="Global", unit="epoch",
                           leave=True, dynamic_ncols=True)
 
+        round_idx = max(start_round - 1, 0)  # default if loop is skipped
         for round_idx in range(start_round, global_rounds):
             # 全局 lr 余弦衰减
             lr_round = lr_init * 0.5 * (1 + math.cos(math.pi * round_idx / global_rounds))
@@ -1100,7 +1128,7 @@ class FedPCNN:
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
                 objective='multi:softprob', num_class=n_classes,
-                tree_method=_xgb_tree_method(), random_state=42, n_jobs=-1, verbosity=0,
+                tree_method="hist", device="cuda", random_state=42, n_jobs=-1, verbosity=0,
             ),
         }
 
@@ -1156,7 +1184,7 @@ class FedPCNN:
             n_estimators=200, max_depth=4, learning_rate=0.1,
             subsample=0.8, colsample_bytree=0.8, min_child_weight=3,
             objective='multi:softprob', num_class=n_classes,
-            tree_method=_xgb_tree_method(), random_state=42, n_jobs=-1, verbosity=0,
+            tree_method="hist", device="cuda", random_state=42, n_jobs=-1, verbosity=0,
         )
         meta_weights = compute_sample_weight('balanced', labels)
         self.svm_classifier.fit(meta_features, labels, sample_weight=meta_weights)
@@ -1216,7 +1244,7 @@ class FedPCNN:
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
                 objective='multi:softprob', num_class=n_classes,
-                tree_method=_xgb_tree_method(), random_state=42, n_jobs=-1, verbosity=0,
+                tree_method="hist", device="cuda", random_state=42, n_jobs=-1, verbosity=0,
             ),
         }
 
@@ -1275,7 +1303,7 @@ class FedPCNN:
                 'reg_lambda': trial.suggest_float('reg_lambda', 1e-3, 10.0, log=True),
                 'objective': 'multi:softprob',
                 'num_class': num_classes,
-                'tree_method': _xgb_tree_method(),
+                'tree_method': 'hist', 'device': 'cuda',
                 'random_state': 42,
                 'n_jobs': -1,
                 'verbosity': 0,
@@ -1339,7 +1367,7 @@ class FedPCNN:
         best.update({
             'objective': 'multi:softprob',
             'num_class': num_classes,
-            'tree_method': _xgb_tree_method(),
+            'tree_method': 'hist', 'device': 'cuda',
             'random_state': 42,
             'n_jobs': -1,
             'verbosity': 0,
