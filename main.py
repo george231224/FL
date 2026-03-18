@@ -125,7 +125,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print("=" * 60)
 
     # 断点续训标识
-    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v2"
+    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v3"
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
@@ -189,7 +189,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         if n_classes == 2:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.08, 8, 0.5, 0.0
         else:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.003, 0.15, 2, 0.5, 2.0
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.003, 0.10, 3, 0.5, 2.0
     else:
         # NSL-KDD: 保留原有最优配置
         if n_classes == 2:

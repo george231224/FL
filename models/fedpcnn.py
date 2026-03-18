@@ -75,22 +75,22 @@ class CNNSVM(nn.Module):
         super(CNNSVM, self).__init__()
 
         # Layer1: Conv1d(32) + GroupNorm + ReLU + MaxPool
-        self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=3, padding=1)
-        self.bn1 = nn.GroupNorm(min(16, 64), 64)
+        self.conv1 = nn.Conv1d(input_channels, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.GroupNorm(min(8, 32), 32)
 
         # Layer2: Conv1d(64) + GroupNorm + ReLU + MaxPool
-        self.conv2 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
-        self.bn2 = nn.GroupNorm(min(16, 128), 128)
+        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.GroupNorm(min(16, 64), 64)
 
         # Layer3: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool
-        self.conv3 = nn.Conv1d(128, 256, kernel_size=3, padding=1)
-        self.bn3 = nn.GroupNorm(min(16, 256), 256)
+        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.GroupNorm(min(16, 128), 128)
 
         self.maxpool = nn.MaxPool1d(kernel_size=2, stride=2)
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
         # Layer4: Dense + ReLU + Dropout
-        self.fc1 = nn.Linear(256, self.FEATURE_DIM)
+        self.fc1 = nn.Linear(128, self.FEATURE_DIM)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
 
@@ -104,7 +104,7 @@ class CNNSVM(nn.Module):
         x = self.maxpool(x)                         # (N, 64, L//4)
         x = self.relu(self.bn3(self.conv3(x)))     # (N, 128, L//4)
         x = self.global_avg_pool(x)                 # (N, 128, 1)
-        x = x.view(x.size(0), -1)                  # (N, 256)
+        x = x.view(x.size(0), -1)                  # (N, 128)
         features = self.relu(self.fc1(x))            # (N, 256)
         x = self.dropout(features)
         x = self.fc2(x)                             # (N, num_classes)
@@ -339,9 +339,13 @@ class FedPCNN:
             cw = cw / cw.sum() * self.num_classes
             cw_tensor = torch.FloatTensor(cw).to(self.device)
 
-        # 损失函数：focal_gamma>0 使用 Focal Loss；focal_gamma==0 退化为标准 CE
-        if focal_gamma > 0:
-            ls = 0.1 if self.num_classes > 5 else 0.05
+        # 损失函数：多分类(>5类)用 BalancedSoftmax；二分类/少类用 FocalLoss/CE
+        if self.num_classes > 5:
+            # 长尾多分类：BalancedSoftmax (class-prior logit correction)
+            # cw_tensor 包含类别频率信息，转为 counts
+            criterion = BalancedSoftmaxLoss(cw_tensor, label_smoothing=0.05)
+        elif focal_gamma > 0:
+            ls = 0.05
             criterion = FocalLoss(alpha=cw_tensor, gamma=focal_gamma, label_smoothing=ls)
         else:
             criterion = nn.CrossEntropyLoss()
@@ -587,12 +591,15 @@ class FedPCNN:
         train_loss_history = []
         val_loss_history = []
 
-        # Center Loss：类内聚拢正则（多分类时启用）
+        # Center Loss：类内聚拢正则（可通过 self.use_center_loss 控制）
         center_loss_fn = None
         lambda_center = 0.05
-        if self.num_classes > 2:
+        use_center = getattr(self, 'use_center_loss', False)  # 默认关闭，需显式开启
+        if self.num_classes > 2 and use_center:
             center_loss_fn = CenterLoss(self.num_classes, CNNSVM.FEATURE_DIM, device=self.device)
             print(f"  Center Loss: ON (lambda={lambda_center})")
+        elif self.num_classes > 2:
+            print(f"  Center Loss: OFF (set model.use_center_loss=True to enable)")
 
         # 早停机制：验证损失连续 patience 次评估未改善则停止
         # patience=5, eval_interval=5 → 5×5=25轮无改善即停（50轮内可触发）
