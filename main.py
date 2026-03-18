@@ -612,6 +612,7 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
     fedpcnn_s2 = FedPCNN(num_devices=num_devices, num_classes=n_classes_s2, input_shape=input_shape, n_continuous=n_continuous)
     if hasattr(fedpcnn_s2, 'device'):
         fedpcnn_s2.device = device
+    fedpcnn_s2._class_counts = torch.FloatTensor(pre_s2_counts)  # raw counts for BalancedSoftmax
 
     # 多分类超参数
     s2_lr, s2_mu, s2_epochs, s2_gamma, s2_focal = 0.005, 0.05, 5, 0.6, 1.5
