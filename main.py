@@ -125,7 +125,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print("=" * 60)
 
     # 断点续训标识
-    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}"
+    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v2"
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)

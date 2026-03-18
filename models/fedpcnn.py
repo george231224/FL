@@ -1128,7 +1128,7 @@ class FedPCNN:
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
                 objective='multi:softprob', num_class=n_classes,
-                tree_method="hist", device="cuda", random_state=42, n_jobs=-1, verbosity=0,
+                tree_method="hist", device="cuda" if __import__("torch").cuda.is_available() else "cpu", random_state=42, n_jobs=-1, verbosity=0,
             ),
         }
 
@@ -1184,7 +1184,7 @@ class FedPCNN:
             n_estimators=200, max_depth=4, learning_rate=0.1,
             subsample=0.8, colsample_bytree=0.8, min_child_weight=3,
             objective='multi:softprob', num_class=n_classes,
-            tree_method="hist", device="cuda", random_state=42, n_jobs=-1, verbosity=0,
+            tree_method="hist", device="cuda" if __import__("torch").cuda.is_available() else "cpu", random_state=42, n_jobs=-1, verbosity=0,
         )
         meta_weights = compute_sample_weight('balanced', labels)
         self.svm_classifier.fit(meta_features, labels, sample_weight=meta_weights)
@@ -1244,7 +1244,7 @@ class FedPCNN:
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
                 objective='multi:softprob', num_class=n_classes,
-                tree_method="hist", device="cuda", random_state=42, n_jobs=-1, verbosity=0,
+                tree_method="hist", device="cuda" if __import__("torch").cuda.is_available() else "cpu", random_state=42, n_jobs=-1, verbosity=0,
             ),
         }
 

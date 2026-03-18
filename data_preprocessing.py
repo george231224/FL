@@ -580,7 +580,7 @@ def partition_non_iid(X, y, num_clients, alpha=0.5, seed=42):
         np.random.shuffle(c_indices)
 
         # 先分保底
-        guaranteed = max(min_per_class, len(c_indices) // (num_clients * 2))  # ~5% per client
+        guaranteed = min(min_per_class, len(c_indices) // num_clients)  # at most min_per_class per client, preserving Non-IID
         ptr = 0
         for client_id in range(num_clients):
             if ptr + guaranteed <= len(c_indices):
