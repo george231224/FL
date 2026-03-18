@@ -189,7 +189,9 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         if n_classes == 2:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.08, 8, 0.5, 0.0
         else:
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.003, 0.10, 3, 0.5, 2.0
+            # [额外修复] 回填 best known config: lr=0.005, local_epochs=5
+            # 之前 lr=0.003/epochs=3 收敛不充分，best result 是 lr=0.005/epochs=5 跑出来的
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.10, 5, 0.5, 2.0
     else:
         # NSL-KDD: 保留原有最优配置
         if n_classes == 2:
@@ -232,6 +234,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
           f"Logit校准={'ON' if use_logit_cal else 'OFF'}, "
           f"动态聚合={'ON' if dynamic_agg else 'OFF'}")
 
+    # [修改1] 将 dynamic_agg 开关传给 train()，真正启用/禁用动态聚合
     train_loss, val_loss = fedpcnn.train(
         client_data=client_data_list,
         global_rounds=global_rounds,
@@ -250,6 +253,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         client_data_raw=client_data_raw,
         smote_warmup_rounds=smote_warmup_rounds,
         checkpoint_tag=ckpt_tag,
+        dynamic_aggregation=dynamic_agg,
     )
 
     # ── 训练完成，立即保存模型权重（防止后续步骤中断丢失） ──────────────

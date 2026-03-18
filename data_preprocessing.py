@@ -386,14 +386,29 @@ class UNSWNB15Preprocessor:
         X_train = ct.fit_transform(X_train_df)
         X_test  = ct.transform(X_test_df)
         self.column_transformer_ = ct
-        self.n_continuous_ = len(selected_cols)  # 全部特征都是数值型
+
+        # [修改3] 记录连续特征数量（排除类别特征）和类别特征索引
+        # CNN 只处理前 n_continuous_ 列（连续特征），类别特征在后面
+        # 数据列顺序: 连续特征在前，类别特征在后
+        # 重排列: 把连续列放前面，类别列放后面
+        num_indices = [selected_cols.index(c) for c in selected_num_cols]
+        cat_indices = [selected_cols.index(c) for c in selected_cat_cols]
+        reorder = num_indices + cat_indices
+        X_train = X_train[:, reorder]
+        X_test = X_test[:, reorder]
+        self.n_continuous_ = len(selected_num_cols)  # CNN 只处理前这么多列
+        self.n_categorical_ = len(selected_cat_cols)  # 类别特征数量
+        # 记录各类别特征的类别数（用于 embedding）
+        self.cat_cardinalities_ = [len(self._label_encoders[c].classes_) for c in selected_cat_cols]
+        self.selected_cat_cols_ = selected_cat_cols
 
         # 打印维度信息
-        print(f"\n[预处理] LabelEncoding + RobustScaler (无 OneHot)")
-        print(f"  连续特征: {len(selected_num_cols)} 列")
+        print(f"\n[预处理] LabelEncoding + RobustScaler")
+        print(f"  连续特征: {len(selected_num_cols)} 列 (→ CNN)")
         if selected_cat_cols:
-            print(f"  类别特征: {selected_cat_cols} → LabelEncoding")
-        print(f"  最终特征维度: {X_train.shape[1]}")
+            print(f"  类别特征: {selected_cat_cols} → LabelEncoding (→ XGBoost, 不进 CNN)")
+            print(f"  类别基数: {dict(zip(selected_cat_cols, self.cat_cardinalities_))}")
+        print(f"  最终特征维度: {X_train.shape[1]} (连续: {self.n_continuous_}, 类别: {self.n_categorical_})")
 
         # 打印类别分布
         class_names = self.label_encoder.classes_

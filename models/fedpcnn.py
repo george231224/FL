@@ -246,14 +246,26 @@ class FedPCNN:
             num_classes: 分类类别数
             input_shape: 输入数据形状 (channels, n_features)
             device: 计算设备
-            n_continuous: 保留兼容，不再使用
+            n_continuous: 连续特征数量。若设置且 < total features，则 CNN 只处理前 n_continuous 列，
+                          剩余类别特征不进 CNN，直接给 XGBoost/Meta-XGB
         """
         self.num_devices = num_devices
         self.num_classes = num_classes
         self.device = device
         self.input_shape = input_shape
 
-        # 初始化全局模型
+        # [修改3] 记录连续特征数，CNN 只处理连续特征
+        total_features = input_shape[1]
+        if n_continuous is not None and n_continuous < total_features:
+            self.n_continuous = n_continuous
+            self.n_categorical = total_features - n_continuous
+            cnn_features = n_continuous
+        else:
+            self.n_continuous = total_features
+            self.n_categorical = 0
+            cnn_features = total_features
+
+        # 初始化全局模型（CNN 输入维度 = 连续特征数，不含类别特征）
         self.global_model = CNNSVM(
             input_channels=input_shape[0],
             num_classes=num_classes
@@ -261,17 +273,28 @@ class FedPCNN:
 
         print(f"FedPCNN初始化完成")
         print(f"设备数: {num_devices}, 类别数: {num_classes}")
-        print(f"  CNN 输入: (1, {input_shape[1]}) 1D")
+        # [修改3] 打印 CNN 实际输入维度
+        if self.n_categorical > 0:
+            print(f"  CNN 输入: (1, {cnn_features}) 1D (仅连续特征，类别特征 {self.n_categorical} 列不进 CNN)")
+        else:
+            print(f"  CNN 输入: (1, {total_features}) 1D")
         print(f"  特征维度: {CNNSVM.FEATURE_DIM}")
         print(f"计算设备: {device}")
     
     def preprocess_data(self, X, y):
-        """数据预处理: 重构为 1D 序列 (N, 1, n_features)
+        """数据预处理: 重构为 1D 序列 (N, 1, n_continuous)
+
+        [修改3] CNN 只处理连续特征（前 n_continuous 列）。
+        类别特征（后 n_categorical 列）不进 CNN，会在 _extract_features_batch 中
+        直接拼接给 XGBoost/Meta-XGB。
+
         注意: 假设数据已经被外部归一化（data_preprocessing.py）
         """
         n_samples = X.shape[0]
-        X = X.reshape(n_samples, 1, -1)
-        return X, y
+        # [修改3] 只取前 n_continuous 列给 CNN
+        X_cnn = X[:, :self.n_continuous]
+        X_cnn = X_cnn.reshape(n_samples, 1, -1)
+        return X_cnn, y
     
     def split_data_non_iid(self, X, y, alpha=0.5):
         """Non-IID数据划分 (Dirichlet分布)"""
@@ -512,8 +535,9 @@ class FedPCNN:
              X_val=None, y_val=None, eval_interval=5,
              pre_smote_class_weights=None,
              client_data_raw=None, smote_warmup_rounds=0,
-             checkpoint_tag=None):
-        """FedPCNN完整训练流程（纯FedProx + 标准FedAvg聚合）
+             checkpoint_tag=None,
+             dynamic_aggregation=False):
+        """FedPCNN完整训练流程（FedProx + 可选动态聚合）
 
         参数:
             gamma:        γ-不精确解参数（越大越早停止，防 drift；越小训练越充分）
@@ -523,6 +547,7 @@ class FedPCNN:
             client_data_raw:     SMOTE之前的原始客户端数据（用于预热）
             smote_warmup_rounds: 预热轮数，前N轮使用原始数据，之后切换到SMOTE数据
             checkpoint_tag:      断点续训标识（如 'UNSW_noniid_multi'），非None时启用自动保存/恢复
+            dynamic_aggregation: 是否启用动态聚合（权重 ∝ 样本数 × 1/loss），默认 False 使用标准 FedAvg
 
         返回:
             (train_loss_history, val_loss_history): 训练损失和验证损失列表
@@ -589,7 +614,9 @@ class FedPCNN:
             print(f"  全局类别权重(SMOTE后,cap={max_ratio:.0f}x): {dict(enumerate(global_cw.round(3).tolist()))}")
 
         print(f"\nStep 3-4: 开始{global_rounds}轮全局训练...")
-        print(f"  聚合方式: 标准FedAvg (样本数加权, p_k = n_k/n)")
+        # [修改1] 动态聚合开关：dynamic_aggregation=True 时使用 aggregate_dynamic（权重 ∝ n_k / loss_k）
+        agg_name = "动态聚合 (n_k / loss_k)" if dynamic_aggregation else "标准FedAvg (p_k = n_k/n)"
+        print(f"  聚合方式: {agg_name}")
 
         # 预处理验证集（一次性，避免每轮重复）
         val_tensor = None
@@ -721,8 +748,13 @@ class FedPCNN:
                 global_bar.update(1)
                 continue
 
-            # 标准 FedAvg 聚合: p_k = n_k / n（论文原文定义）
-            aggregated_weights = self.aggregate(local_weights_list, local_sizes)
+            # [修改1] 根据 dynamic_aggregation 开关选择聚合方式
+            # dynamic_aggregation=True: 权重 ∝ 样本数 × (1/loss)，训练质量好的客户端获更高权重
+            # dynamic_aggregation=False: 标准 FedAvg，权重 ∝ 样本数
+            if dynamic_aggregation and local_losses:
+                aggregated_weights = self.aggregate_dynamic(local_weights_list, local_sizes, local_losses)
+            else:
+                aggregated_weights = self.aggregate(local_weights_list, local_sizes)
 
             self.global_model.load_state_dict(aggregated_weights)
 
@@ -1075,7 +1107,11 @@ class FedPCNN:
         return metrics
 
     def _extract_features_batch(self, X, y, batch_size=256):
-        """批量提取 CNN 特征，并拼接原始特征
+        """批量提取 CNN 特征，并拼接原始特征（含类别特征）
+
+        [修改3] CNN 只处理连续特征（前 n_continuous 列），类别特征（后 n_categorical 列）
+        不经过 CNN，而是直接拼接到 XGBoost 的输入特征中。
+        最终特征矩阵: [CNN_features(256d) | 全部原始特征(连续+类别)]
 
         参数:
             X, y: 原始数据（未预处理，含全部特征列）
@@ -1099,7 +1135,8 @@ class FedPCNN:
                 label_list.append(by.cpu().numpy())
 
         cnn_features = np.concatenate(feat_list)
-        # 拼接原始特征: XGBoost 同时利用 CNN 特征 + 原始特征
+        # [修改3] 拼接 CNN 特征 + 全部原始特征（连续+类别）
+        # 类别特征虽不进 CNN，但 XGBoost 能天然处理它们（树模型擅长类别特征）
         combined = np.concatenate([cnn_features, X], axis=1)
         return combined, np.concatenate(label_list)
 
@@ -1513,15 +1550,22 @@ class FedPCNN:
 
         return metrics, all_preds, labels
 
-    def search_normal_threshold(self, X_val, y_val, batch_size=256):
-        """在验证集上搜索最优 Normal 门限
+    def search_normal_threshold(self, X_val, y_val, batch_size=256, far_penalty_lambda=10.0):
+        """在验证集上搜索最优 Normal 门限（带 FAR 约束）
 
-        目标：最大化 Macro-F1，同时 FAR 不超过单阶段基线水平
-        搜索范围：0.3 ~ 0.7，步长 0.05
+        [修改2] 原版只按 Macro-F1 选最优门限，导致 FAR 上涨。
+        改为带 FAR 惩罚的评分函数:
+            score = Macro-F1 - λ * max(0, FAR - FAR_baseline)
+        其中 FAR_baseline 是无门限时的 FAR（argmax 预测）。
+        这样在 Macro-F1 提升不足以补偿 FAR 恶化时，会优先保持低 FAR。
+
+        参数:
+            far_penalty_lambda: FAR 惩罚系数，默认 10.0（FAR 每涨 1% 扣 10 分 Macro-F1）
+        搜索范围：0.3 ~ 0.7，步长 0.025（更精细）
         """
         from sklearn.metrics import f1_score, confusion_matrix
 
-        print("\n搜索最优 Normal 门限...")
+        print("\n搜索最优 Normal 门限（带 FAR 约束）...")
         features, labels = self._extract_features_batch(X_val, y_val, batch_size)
         features_scaled = self.svm_scaler.transform(features)
 
@@ -1532,11 +1576,25 @@ class FedPCNN:
             pred_input = features_scaled
         proba = self.svm_classifier.predict_proba(pred_input)
 
+        # [修改2] 先计算无门限 baseline FAR（纯 argmax）
+        baseline_preds = proba.argmax(axis=1)
+        cm_base = confusion_matrix(labels, baseline_preds)
+        normal_total_base = cm_base[0, :].sum()
+        attack_total_base = cm_base[1:, :].sum()
+        fpr_base = cm_base[0, 1:].sum() / normal_total_base if normal_total_base > 0 else 0.0
+        fnr_base = cm_base[1:, 0].sum() / attack_total_base if attack_total_base > 0 else 0.0
+        far_baseline = (fpr_base + fnr_base) / 2 * 100
+        baseline_f1 = f1_score(labels, baseline_preds, average='macro', zero_division=0) * 100
+        print(f"  Baseline (无门限): Macro-F1={baseline_f1:.2f}%, FAR={far_baseline:.2f}%")
+        print(f"  FAR 惩罚系数 λ={far_penalty_lambda} (FAR 每涨 1% 扣 {far_penalty_lambda} 分)")
+
         best_threshold = None
         best_score = -1.0
+        best_far = far_baseline
+        best_f1 = baseline_f1
         results = []
 
-        for t in np.arange(0.30, 0.75, 0.05):
+        for t in np.arange(0.30, 0.75, 0.025):
             preds = np.where(proba[:, 0] >= t, 0, proba[:, 1:].argmax(axis=1) + 1)
             macro_f1 = f1_score(labels, preds, average='macro', zero_division=0) * 100
             acc = 100 * (preds == labels).mean()
@@ -1546,14 +1604,30 @@ class FedPCNN:
             fpr = cm[0, 1:].sum() / normal_total if normal_total > 0 else 0.0
             fnr = cm[1:, 0].sum() / attack_total if attack_total > 0 else 0.0
             far = (fpr + fnr) / 2 * 100
-            results.append((t, acc, macro_f1, far))
-            print(f"  threshold={t:.2f} → Acc={acc:.2f}%, Macro-F1={macro_f1:.2f}%, FAR={far:.2f}%")
 
-            if macro_f1 > best_score:
-                best_score = macro_f1
+            # [修改2] 带 FAR 约束的评分: score = F1 - λ * max(0, FAR - baseline)
+            far_excess = max(0.0, far - far_baseline)
+            score = macro_f1 - far_penalty_lambda * far_excess
+
+            results.append((t, acc, macro_f1, far, score))
+            marker = " *" if score > best_score else ""
+            print(f"  threshold={t:.3f} → Acc={acc:.2f}%, Macro-F1={macro_f1:.2f}%, "
+                  f"FAR={far:.2f}%, score={score:.2f}{marker}")
+
+            if score > best_score:
+                best_score = score
                 best_threshold = t
+                best_far = far
+                best_f1 = macro_f1
 
-        print(f"\n  最优门限: {best_threshold:.2f} (Macro-F1={best_score:.2f}%)")
+        # [修改2] 如果最佳门限没有比 baseline 更好，返回 None（不使用门限）
+        baseline_score = baseline_f1  # baseline FAR excess = 0
+        if best_score <= baseline_score:
+            print(f"\n  门限搜索未找到优于 baseline 的配置，不使用门限")
+            print(f"  Baseline score={baseline_score:.2f} vs best threshold score={best_score:.2f}")
+            return None
+
+        print(f"\n  最优门限: {best_threshold:.3f} (Macro-F1={best_f1:.2f}%, FAR={best_far:.2f}%, score={best_score:.2f})")
         return best_threshold
 
     def predict_with_svm(self, X, batch_size=256):

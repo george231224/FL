@@ -30,7 +30,8 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
 
     set_seed(seed)
 
-    X_train, y_train, X_test, y_test, n_classes, n_features, class_names = \
+    # [额外修复] get_dataset 现在返回 8 个值（含 n_continuous）
+    X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = \
         get_dataset(dataset_name, classification)
 
     X_train, X_val, y_train, y_val = train_test_split(
@@ -59,14 +60,14 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
         k_neighbors=5,
     )
 
-    import math
-    side_length = int(math.ceil(math.sqrt(n_features)))
-    input_shape = (1, side_length, side_length)
+    # [额外修复] 使用 1D 输入形状（与 main.py 对齐），传入 n_continuous
+    input_shape = (1, n_features)
 
     fedpcnn = FedPCNN(
         num_devices=num_devices,
         num_classes=n_classes,
         input_shape=input_shape,
+        n_continuous=n_continuous,
     )
     fedpcnn.device = device
 
@@ -78,6 +79,7 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
     else:
         hp_lr, hp_mu, hp_local_epochs, hp_gamma = 0.005, 0.05, 5, 0.6  # gamma 0.4→0.6
 
+    # [额外修复] 使用新的 dynamic_aggregation 参数（原来传 dynamic_aggregation 到旧接口会报错）
     train_loss, val_loss = fedpcnn.train(
         client_data=client_data_list,
         global_rounds=global_rounds,
@@ -87,10 +89,10 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
         lr=hp_lr, mu=hp_mu, gamma=hp_gamma,
         focal_gamma=focal_gamma,
         alpha=alpha,
-        dynamic_aggregation=dynamic_agg,
         X_val=X_val, y_val=y_val,
         eval_interval=5,
         pre_smote_class_weights=pre_smote_class_weights,
+        dynamic_aggregation=dynamic_agg,
     )
 
     # cRT
