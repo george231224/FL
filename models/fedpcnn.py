@@ -1086,7 +1086,7 @@ class FedPCNN:
         # FAR 通用公式（class 0 = Normal，支持二分类和多分类）
         # FPR = Normal 被预测为任意攻击的比例
         # FNR = 攻击被预测为 Normal 的比例
-        cm = confusion_matrix(all_labels, all_preds)
+        cm = confusion_matrix(all_labels, all_preds, labels=list(range(self.num_classes)))
         normal_total = cm[0, :].sum()
         attack_total = cm[1:, :].sum()
         FPR = cm[0, 1:].sum() / normal_total if normal_total > 0 else 0.0
@@ -1378,7 +1378,7 @@ class FedPCNN:
                           eval_set=[(X_va, y_va)],
                           early_stopping_rounds=20, verbose=False)
                 preds = model.predict(X_va)
-                fold_scores.append(f1_score(y_va, preds, average='macro'))
+                fold_scores.append(f1_score(y_va, preds, average='macro', zero_division=0))
             return np.mean(fold_scores)
 
         study_name = 'Stacking_Meta_BOHB'
@@ -1530,7 +1530,7 @@ class FedPCNN:
             print(f"    类别 {cls_idx}: {rec*100:.1f}%")
         print(f"\n  Macro平均: Precision={macro_precision:.2f}%, Recall={macro_recall:.2f}%, F1={macro_f1:.2f}%")
 
-        cm = confusion_matrix(labels, all_preds)
+        cm = confusion_matrix(labels, all_preds, labels=list(range(self.num_classes)))
         normal_total = cm[0, :].sum()
         attack_total = cm[1:, :].sum()
         FPR = cm[0, 1:].sum() / normal_total if normal_total > 0 else 0.0
