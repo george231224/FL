@@ -1198,7 +1198,7 @@ class FedPCNN:
                 proba = model_clone.predict_proba(X_va)
                 if proba.shape[1] < n_classes:
                     full_proba = np.zeros((len(X_va), n_classes))
-                    full_proba[:, :proba.shape[1]] = proba
+                    full_proba[:, model_clone.classes_.astype(int)] = proba
                     proba = full_proba
                 meta_features[va_idx, col_start:col_end] = proba
 
@@ -1302,7 +1302,7 @@ class FedPCNN:
                 proba = model_clone.predict_proba(X_va)
                 if proba.shape[1] < n_classes:
                     full_proba = np.zeros((len(X_va), n_classes))
-                    full_proba[:, :proba.shape[1]] = proba
+                    full_proba[:, model_clone.classes_.astype(int)] = proba
                     proba = full_proba
                 meta_features[va_idx, col_start:col_end] = proba
             print("done")
@@ -1442,7 +1442,7 @@ class FedPCNN:
             proba = model.predict_proba(features_scaled)
             if proba.shape[1] < n_classes:
                 full_proba = np.zeros((len(features_scaled), n_classes))
-                full_proba[:, :proba.shape[1]] = proba
+                full_proba[:, model_clone.classes_.astype(int)] = proba
                 proba = full_proba
             meta_parts.append(proba)
         return np.hstack(meta_parts)
