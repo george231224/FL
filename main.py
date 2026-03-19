@@ -189,9 +189,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         if n_classes == 2:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.008, 0.08, 8, 0.5, 0.0
         else:
-            # [额外修复] 回填 best known config: lr=0.005, local_epochs=5
-            # 之前 lr=0.003/epochs=3 收敛不充分，best result 是 lr=0.005/epochs=5 跑出来的
-            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.10, 5, 0.5, 2.0
+            # 回退至历史最佳配置 (commit 378f261)
+            hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.3, 1.5
     else:
         # NSL-KDD: 保留原有最优配置
         if n_classes == 2:
@@ -206,14 +205,17 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     if use_smote:
         pre_smote_labels = np.concatenate([y for _, y in client_data_list])
         pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
-        pre_smote_cw = 1.0 / pre_smote_counts
-        min_cw = pre_smote_cw.min()
-        cw_cap = 50.0 if n_classes > 5 else 15.0
-        pre_smote_cw = np.clip(pre_smote_cw, 0, min_cw * cw_cap)
-        pre_smote_cw = pre_smote_cw / pre_smote_cw.sum() * n_classes
-        pre_smote_class_weights = torch.FloatTensor(pre_smote_cw)
-        # Store raw counts for BalancedSoftmaxLoss (NOT weights)
-        fedpcnn._class_counts = torch.FloatTensor(pre_smote_counts)
+        # Class-Balanced effective-number weights (GPT o3 建议)
+        beta = 0.999
+        effective_num = 1.0 - np.power(beta, pre_smote_counts)
+        cb_weights = (1.0 - beta) / (effective_num + 1e-8)
+        cb_weights = cb_weights / cb_weights.sum() * n_classes
+        # 额外 cap 防止极端权重
+        cw_cap = 30.0 if n_classes > 5 else 15.0
+        min_cw = cb_weights.min()
+        cb_weights = np.clip(cb_weights, 0, min_cw * cw_cap)
+        cb_weights = cb_weights / cb_weights.sum() * n_classes
+        pre_smote_class_weights = torch.FloatTensor(cb_weights)
 
         # Non-IID 场景：取消SMOTE预热，从第1轮直接用SMOTE数据，避免切换震荡
         if partition_type == 'non-iid':
@@ -987,8 +989,8 @@ if __name__ == '__main__':
     parser.add_argument('--classification', type=str, choices=['binary', 'multi'],
                         default='multi',
                         help='分类模式: binary (二分类) 或 multi (多分类，默认)')
-    parser.add_argument('--no-dynamic-agg', action='store_true', default=False,
-                        help='禁用动态聚合')
+    parser.add_argument('--no-dynamic-agg', action='store_true', default=True,
+                        help='禁用动态聚合（默认禁用）')
     parser.add_argument('--bohb', type=int, default=0, metavar='N',
                         help='XGBoost BOHB超参搜索试验次数 (0=禁用, 推荐30)')
 

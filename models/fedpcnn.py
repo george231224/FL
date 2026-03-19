@@ -61,51 +61,38 @@ class SRFCNNBlock1D(nn.Module):
 
 
 class CNNSVM(nn.Module):
-    """论文 FedPCNN 3层CNN结构 (32→64→128):
-    Layer1: Conv1d(32) + GroupNorm + ReLU + MaxPool1d  — 浅层局部特征
-    Layer2: Conv1d(64) + GroupNorm + ReLU + MaxPool1d  — 中层模式特征
-    Layer3: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool1d — 深层语义特征
-    Layer4: Dense(256) + ReLU + Dropout — 全连接
-    Layer5: Dense(num_classes) — 输出层
+    """FedPCNN 1层CNN结构 (回退至历史最佳配置):
+    Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool1d + GlobalAvgPool1d
+    Layer2: Dense(128) + ReLU + Dropout(0.3)
+    Layer3: Dense(num_classes) — 输出层
     注: 原论文用 Conv2D，表格数据用 1D 卷积等效
     """
-    FEATURE_DIM = 256  # CNN 输出特征维度（供外部引用）
+    FEATURE_DIM = 128  # CNN 输出特征维度（供外部引用）
 
     def __init__(self, input_channels=1, input_height=None, num_classes=2):
         super(CNNSVM, self).__init__()
 
-        # Layer1: Conv1d(32) + GroupNorm + ReLU + MaxPool
-        self.conv1 = nn.Conv1d(input_channels, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.GroupNorm(min(8, 32), 32)
-
-        # Layer2: Conv1d(64) + GroupNorm + ReLU + MaxPool
-        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.GroupNorm(min(16, 64), 64)
-
-        # Layer3: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool
-        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.GroupNorm(min(16, 128), 128)
+        # Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool + GlobalAvgPool
+        self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=3, padding=1)
+        self.bn1 = nn.GroupNorm(min(16, 64), 64)
 
         self.maxpool = nn.MaxPool1d(kernel_size=2, stride=2)
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
-        # Layer4: Dense + ReLU + Dropout
-        self.fc1 = nn.Linear(128, self.FEATURE_DIM)
+        # Layer2: Dense + ReLU + Dropout
+        self.fc1 = nn.Linear(64, self.FEATURE_DIM)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
 
-        # Layer5: 输出层
+        # Layer3: 输出层
         self.fc2 = nn.Linear(self.FEATURE_DIM, num_classes)
 
     def forward(self, x, return_features=False):
-        x = self.relu(self.bn1(self.conv1(x)))     # (N, 32, L)
-        x = self.maxpool(x)                         # (N, 32, L//2)
-        x = self.relu(self.bn2(self.conv2(x)))     # (N, 64, L//2)
-        x = self.maxpool(x)                         # (N, 64, L//4)
-        x = self.relu(self.bn3(self.conv3(x)))     # (N, 128, L//4)
-        x = self.global_avg_pool(x)                 # (N, 128, 1)
-        x = x.view(x.size(0), -1)                  # (N, 128)
-        features = self.relu(self.fc1(x))            # (N, 256)
+        x = self.relu(self.bn1(self.conv1(x)))     # (N, 64, L)
+        x = self.maxpool(x)                         # (N, 64, L//2)
+        x = self.global_avg_pool(x)                 # (N, 64, 1)
+        x = x.view(x.size(0), -1)                  # (N, 64)
+        features = self.relu(self.fc1(x))            # (N, 128)
         x = self.dropout(features)
         x = self.fc2(x)                             # (N, num_classes)
 
@@ -114,14 +101,11 @@ class CNNSVM(nn.Module):
         return x
 
     def extract_features(self, x):
-        """提取 fc1 特征（256 维）"""
+        """提取 fc1 特征（128 维）"""
         with torch.no_grad():
             x = self.relu(self.bn1(self.conv1(x)))
             x = self.maxpool(x)
-            x = self.relu(self.bn2(self.conv2(x)))
-            x = self.maxpool(x)
-            x = self.relu(self.bn3(self.conv3(x)))
-            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 256)
+            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 64)
             features = self.relu(self.fc1(x))
         return features
 
@@ -374,13 +358,9 @@ class FedPCNN:
             cw = cw / cw.sum() * self.num_classes
             cw_tensor = torch.FloatTensor(cw).to(self.device)
 
-        # 损失函数：多分类(>5类)用 BalancedSoftmax；二分类/少类用 FocalLoss/CE
-        if self.num_classes > 5 and hasattr(self, '_class_counts'):
-            # 长尾多分类：BalancedSoftmax (class-prior logit correction)
-            # 使用原始类别计数，NOT inverse-frequency weights
-            criterion = BalancedSoftmaxLoss(self._class_counts, label_smoothing=0.05)
-        elif focal_gamma > 0:
-            ls = 0.05
+        # 损失函数：统一用 FocalLoss（不管 num_classes 多少）
+        if focal_gamma > 0:
+            ls = 0.1 if self.num_classes > 5 else 0.05
             criterion = FocalLoss(alpha=cw_tensor, gamma=focal_gamma, label_smoothing=ls)
         else:
             criterion = nn.CrossEntropyLoss()
@@ -389,10 +369,12 @@ class FedPCNN:
         wd = 1e-4 if self.num_classes > 5 else 5e-4  # 减轻L2正则 (FL已有FedProx近端正则)
         optimizer = optim.SGD(local_model.parameters(), lr=lr, momentum=0.9, weight_decay=wd)
 
-        # 学习率调度器 - CosineAnnealingLR（eta_min=10%初始lr，避免本地训练后期学习率过低）
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        # 学习率调度器 - CosineAnnealingWarmRestarts（warm-restart，避免局部最优）
+        from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+        scheduler = CosineAnnealingWarmRestarts(
             optimizer,
-            T_max=epochs,
+            T_0=max(1, epochs // 2),
+            T_mult=1,
             eta_min=lr * 0.1
         )
 
@@ -424,7 +406,7 @@ class FedPCNN:
             for batch_X, batch_y in dataloader:
                 optimizer.zero_grad()
 
-                # 前向传播：同时获取 logits 和 256 维 embedding
+                # 前向传播：同时获取 logits 和 128 维 embedding
                 if center_loss_fn is not None:
                     outputs, features = local_model(batch_X, return_features=True)
                 else:
@@ -648,9 +630,7 @@ class FedPCNN:
         best_weights = None
 
         # 构建评估用损失函数（与训练一致，确保 train/val loss 量纲统一）
-        if self.num_classes > 5 and hasattr(self, '_class_counts'):
-            eval_criterion = BalancedSoftmaxLoss(self._class_counts, label_smoothing=0.05)
-        elif focal_gamma > 0:
+        if focal_gamma > 0:
             ls = 0.1 if self.num_classes > 5 else 0.05
             eval_criterion = FocalLoss(alpha=global_class_weights, gamma=focal_gamma,
                                        label_smoothing=ls, reduction='mean')
@@ -1111,7 +1091,7 @@ class FedPCNN:
 
         [修改3] CNN 只处理连续特征（前 n_continuous 列），类别特征（后 n_categorical 列）
         不经过 CNN，而是直接拼接到 XGBoost 的输入特征中。
-        最终特征矩阵: [CNN_features(256d) | 全部原始特征(连续+类别)]
+        最终特征矩阵: [CNN_features(128d) | 全部原始特征(连续+类别)]
 
         参数:
             X, y: 原始数据（未预处理，含全部特征列）
@@ -1550,7 +1530,7 @@ class FedPCNN:
 
         return metrics, all_preds, labels
 
-    def search_normal_threshold(self, X_val, y_val, batch_size=256, far_penalty_lambda=10.0):
+    def search_normal_threshold(self, X_val, y_val, batch_size=256, far_penalty_lambda=5.0):
         """在验证集上搜索最优 Normal 门限（带 FAR 约束）
 
         [修改2] 原版只按 Macro-F1 选最优门限，导致 FAR 上涨。
