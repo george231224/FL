@@ -125,7 +125,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print("=" * 60)
 
     # 断点续训标识
-    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v3"
+    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v7"
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
@@ -208,9 +208,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         pre_smote_labels = np.concatenate([y for _, y in client_data_list])
         pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
         # Class-Balanced effective-number weights (GPT o3 建议)
-        beta = 0.999
-        effective_num = 1.0 - np.power(beta, pre_smote_counts)
-        cb_weights = (1.0 - beta) / (effective_num + 1e-8)
+        # √逆频率权重（替代 CB effective-number，对极端不平衡更有区分度）
+        cb_weights = 1.0 / np.sqrt(pre_smote_counts)
         cb_weights = cb_weights / cb_weights.sum() * n_classes
         # 额外 cap 防止极端权重
         cw_cap = 30.0 if n_classes > 5 else 15.0
