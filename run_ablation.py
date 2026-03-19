@@ -71,8 +71,9 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
         n_continuous=n_continuous,
     )
     fedpcnn.device = device
+    # [审查修复] 设置 _class_counts，使 UNSW 多分类走 BalancedSoftmaxLoss（与 main.py 一致）
+    fedpcnn._class_counts = torch.FloatTensor(pre_smote_counts)
 
-    # 超参数（与 main.py 对齐）
     # 超参数与 main.py 严格对齐
     if dataset_name.upper().startswith('UNSW'):
         if n_classes == 2:
@@ -153,7 +154,13 @@ def run_fedpcnn_single(dataset_name, classification, partition_type, alpha,
     else:
         features, labels = fedpcnn._extract_features_batch(X_test, y_test)
         features_scaled = fedpcnn.svm_scaler.transform(features)
-        preds = fedpcnn.svm_classifier.predict(features_scaled)
+        # [审查修复] 走 stacking 路径，与 evaluate_with_svm 一致
+        use_stacking = hasattr(fedpcnn, '_base_learners') and fedpcnn._base_learners
+        if use_stacking:
+            pred_input = fedpcnn._build_meta_features(features_scaled)
+        else:
+            pred_input = features_scaled
+        preds = fedpcnn.svm_classifier.predict(pred_input)
         per_cls = recall_score(labels, preds, average=None, zero_division=0)
 
     metrics['per_class_recall'] = {int(i): round(float(v) * 100, 2)
