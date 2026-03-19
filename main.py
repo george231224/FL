@@ -165,6 +165,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     if hasattr(fedpcnn, 'device'):
         fedpcnn.device = device
 
+    fedpcnn.use_center_loss = True
+
     print("\n开始训练...")
 
     client_data_list = [client_data[i] for i in range(num_devices)]

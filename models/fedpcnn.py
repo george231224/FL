@@ -61,37 +61,43 @@ class SRFCNNBlock1D(nn.Module):
 
 
 class CNNSVM(nn.Module):
-    """FedPCNN 1层CNN结构 (回退至历史最佳配置):
-    Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool1d + GlobalAvgPool1d
-    Layer2: Dense(128) + ReLU + Dropout(0.3)
-    Layer3: Dense(num_classes) — 输出层
-    注: 原论文用 Conv2D，表格数据用 1D 卷积等效
+    """FedPCNN 2层CNN结构:
+    Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool1d
+    Layer2: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool1d
+    Layer3: Dense(128) + ReLU + Dropout(0.3)
+    Layer4: Dense(num_classes) — 输出层
+    注: 只在 conv1 后 maxpool 一次（20维输入太短，不能多次 pool）
     """
     FEATURE_DIM = 128  # CNN 输出特征维度（供外部引用）
 
     def __init__(self, input_channels=1, input_height=None, num_classes=2):
         super(CNNSVM, self).__init__()
 
-        # Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool + GlobalAvgPool
+        # Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool
         self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=3, padding=1)
         self.bn1 = nn.GroupNorm(min(16, 64), 64)
+
+        # Layer2: Conv1d(128) + GroupNorm + ReLU
+        self.conv2 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.GroupNorm(min(16, 128), 128)
 
         self.maxpool = nn.MaxPool1d(kernel_size=2, stride=2)
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
-        # Layer2: Dense + ReLU + Dropout
-        self.fc1 = nn.Linear(64, self.FEATURE_DIM)
+        # Layer3: Dense + ReLU + Dropout
+        self.fc1 = nn.Linear(128, self.FEATURE_DIM)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
 
-        # Layer3: 输出层
+        # Layer4: 输出层
         self.fc2 = nn.Linear(self.FEATURE_DIM, num_classes)
 
     def forward(self, x, return_features=False):
         x = self.relu(self.bn1(self.conv1(x)))     # (N, 64, L)
         x = self.maxpool(x)                         # (N, 64, L//2)
-        x = self.global_avg_pool(x)                 # (N, 64, 1)
-        x = x.view(x.size(0), -1)                  # (N, 64)
+        x = self.relu(self.bn2(self.conv2(x)))     # (N, 128, L//2)
+        x = self.global_avg_pool(x)                 # (N, 128, 1)
+        x = x.view(x.size(0), -1)                  # (N, 128)
         features = self.relu(self.fc1(x))            # (N, 128)
         x = self.dropout(features)
         x = self.fc2(x)                             # (N, num_classes)
@@ -105,7 +111,8 @@ class CNNSVM(nn.Module):
         with torch.no_grad():
             x = self.relu(self.bn1(self.conv1(x)))
             x = self.maxpool(x)
-            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 64)
+            x = self.relu(self.bn2(self.conv2(x)))
+            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 128)
             features = self.relu(self.fc1(x))
         return features
 
@@ -1123,7 +1130,7 @@ class FedPCNN:
     def train_svm(self, X_train, y_train, C=1.0, kernel='rbf'):
         """用 CNN 特征训练 Stacking 集成分类器
 
-        论文架构: CNN 特征 → RF + KNN + XGBoost (基学习器) → Meta-XGBoost (元学习器)
+        论文架构: CNN 特征 → RF + XGBoost (基学习器) → Meta-XGBoost (元学习器)
         使用 5折 out-of-fold 策略生成元特征，避免过拟合。
 
         参数:
@@ -1135,11 +1142,10 @@ class FedPCNN:
         from sklearn.preprocessing import StandardScaler
         from sklearn.model_selection import StratifiedKFold
         from sklearn.ensemble import RandomForestClassifier
-        from sklearn.neighbors import KNeighborsClassifier
         from xgboost import XGBClassifier
         from sklearn.utils.class_weight import compute_sample_weight
 
-        print("\n训练 Stacking 集成分类器 (RF + KNN + XGBoost → Meta-XGBoost)...")
+        print("\n训练 Stacking 集成分类器 (RF + XGBoost → Meta-XGBoost)...")
 
         # 提取 CNN 特征
         features, labels = self._extract_features_batch(X_train, y_train)
@@ -1159,9 +1165,6 @@ class FedPCNN:
                 n_estimators=200, max_depth=12, min_samples_leaf=5,
                 class_weight='balanced', random_state=42, n_jobs=-1,
             ),
-            'KNN': KNeighborsClassifier(
-                n_neighbors=7, weights='distance', n_jobs=-1,
-            ),
             'XGB': XGBClassifier(
                 n_estimators=300, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
@@ -1173,7 +1176,7 @@ class FedPCNN:
         # ── 5折 Out-of-Fold 生成元特征 ──
         print(f"  5折 Out-of-Fold 生成元特征...")
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-        # 每个基学习器输出 n_classes 维概率 → 元特征维度 = 3 * n_classes
+        # 每个基学习器输出 n_classes 维概率 → 元特征维度 = 2 * n_classes
         meta_features = np.zeros((n_samples, len(base_learners) * n_classes))
 
         for name_idx, (name, base_model) in enumerate(base_learners.items()):
@@ -1189,13 +1192,10 @@ class FedPCNN:
                 model_clone = _clone_model(base_model)
                 if name == 'XGB':
                     model_clone.fit(X_tr, y_tr, sample_weight=sw_tr)
-                elif name == 'RF':
-                    model_clone.fit(X_tr, y_tr)  # RF 用 class_weight='balanced'
                 else:
-                    model_clone.fit(X_tr, y_tr)
+                    model_clone.fit(X_tr, y_tr)  # RF 用 class_weight='balanced'
 
                 proba = model_clone.predict_proba(X_va)
-                # 处理 KNN 等可能不输出全部类别的情况
                 if proba.shape[1] < n_classes:
                     full_proba = np.zeros((len(X_va), n_classes))
                     full_proba[:, :proba.shape[1]] = proba
@@ -1234,7 +1234,7 @@ class FedPCNN:
 
         流程:
           1. 提取 CNN 特征
-          2. 5折 OOF 训练 RF + KNN + XGBoost 基学习器 → 元特征
+          2. 5折 OOF 训练 RF + XGBoost 基学习器 → 元特征
           3. Optuna 搜索 Meta-XGBoost 超参数 (3折CV on 元特征)
           4. 用最优参数全量训练 Meta-XGBoost
 
@@ -1249,7 +1249,6 @@ class FedPCNN:
         from sklearn.metrics import f1_score
         from sklearn.utils.class_weight import compute_sample_weight
         from sklearn.ensemble import RandomForestClassifier
-        from sklearn.neighbors import KNeighborsClassifier
         from xgboost import XGBClassifier
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -1274,9 +1273,6 @@ class FedPCNN:
             'RF': RandomForestClassifier(
                 n_estimators=200, max_depth=12, min_samples_leaf=5,
                 class_weight='balanced', random_state=42, n_jobs=-1,
-            ),
-            'KNN': KNeighborsClassifier(
-                n_neighbors=7, weights='distance', n_jobs=-1,
             ),
             'XGB': XGBClassifier(
                 n_estimators=300, max_depth=6, learning_rate=0.1,
