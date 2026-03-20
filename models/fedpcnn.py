@@ -61,46 +61,45 @@ class SRFCNNBlock1D(nn.Module):
 
 
 class CNNSVM(nn.Module):
-    """FedPCNN 2层CNN结构:
-    Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool1d
-    Layer2: Conv1d(128) + GroupNorm + ReLU + GlobalAvgPool1d
-    Layer3: Dense(128) + ReLU + Dropout(0.3)
-    Layer4: Dense(num_classes) — 输出层
-    注: 只在 conv1 后 maxpool 一次（20维输入太短，不能多次 pool）
+    """FedPCNN 1层CNN结构 (回退至历史最佳 378f261 架构):
+    Layer1: Conv1d(64) + GroupNorm + ReLU
+    Layer2: MaxPool1d — 降维防过拟合
+    Layer3: GlobalAvgPool1d — 空间维度→一维全局特征
+    Layer4: Dense(128) + ReLU + Dropout(0.3) — 全连接防过拟合
+    Layer5: Dense(num_classes) — 输出层
+    注: 原论文用 Conv2D，表格数据用 1D 卷积等效
     """
     FEATURE_DIM = 128  # CNN 输出特征维度（供外部引用）
 
     def __init__(self, input_channels=1, input_height=None, num_classes=2):
         super(CNNSVM, self).__init__()
 
-        # Layer1: Conv1d(64) + GroupNorm + ReLU + MaxPool
+        # Layer1: Conv1d(64) + GroupNorm + ReLU
         self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=3, padding=1)
         self.bn1 = nn.GroupNorm(min(16, 64), 64)
 
-        # Layer2: Conv1d(128) + GroupNorm + ReLU
-        self.conv2 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
-        self.bn2 = nn.GroupNorm(min(16, 128), 128)
-
+        # Layer2: MaxPool1d
         self.maxpool = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        # Layer3: GlobalAvgPool1d
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
-        # Layer3: Dense + ReLU + Dropout
-        self.fc1 = nn.Linear(128, self.FEATURE_DIM)
+        # Layer4: Dense + ReLU + Dropout
+        self.fc1 = nn.Linear(64, self.FEATURE_DIM)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
 
-        # Layer4: 输出层
+        # Layer5: 输出层
         self.fc2 = nn.Linear(self.FEATURE_DIM, num_classes)
 
     def forward(self, x, return_features=False):
-        x = self.relu(self.bn1(self.conv1(x)))     # (N, 64, L)
-        x = self.maxpool(x)                         # (N, 64, L//2)
-        x = self.relu(self.bn2(self.conv2(x)))     # (N, 128, L//2)
-        x = self.global_avg_pool(x)                 # (N, 128, 1)
-        x = x.view(x.size(0), -1)                  # (N, 128)
-        features = self.relu(self.fc1(x))            # (N, 128)
+        x = self.relu(self.bn1(self.conv1(x)))     # Layer1: (N, 64, L)
+        x = self.maxpool(x)                         # Layer2: (N, 64, L//2)
+        x = self.global_avg_pool(x)                 # Layer3: (N, 64, 1)
+        x = x.view(x.size(0), -1)                  # (N, 64)
+        features = self.relu(self.fc1(x))            # Layer4: (N, 128)
         x = self.dropout(features)
-        x = self.fc2(x)                             # (N, num_classes)
+        x = self.fc2(x)                             # Layer5: (N, num_classes)
 
         if return_features:
             return x, features
@@ -111,8 +110,7 @@ class CNNSVM(nn.Module):
         with torch.no_grad():
             x = self.relu(self.bn1(self.conv1(x)))
             x = self.maxpool(x)
-            x = self.relu(self.bn2(self.conv2(x)))
-            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 128)
+            x = self.global_avg_pool(x).view(x.size(0), -1)  # (N, 64)
             features = self.relu(self.fc1(x))
         return features
 

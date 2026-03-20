@@ -350,12 +350,15 @@ class UNSWNB15Preprocessor:
         y_test  = y_all[test_idx]
         print(f"分层划分完成: 训练+验证 {len(y_train):,}  测试 {len(y_test):,}")
 
-        # MRMR 特征选择：top_k=20 回退至历史最佳配置
+        # MRMR 特征选择：不硬截断，用累计阈值 threshold=0.95 自动选择
+        # v8: 从 top_k=20 改为 threshold 模式，保留更多有意义的特征
+        # 20维丢掉近半信息(cumsum=0.57)，且包含4个零Relevance特征
         selected_cols = mrmr_feature_selection(
             X_train_df, y_train,
             categorical_cols=categorical_cols,
             n_bins=15,
-            top_k=20
+            top_k=None,
+            threshold=0.95
         )
         self.selected_feature_names_ = selected_cols
 

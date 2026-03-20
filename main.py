@@ -125,7 +125,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print("=" * 60)
 
     # 断点续训标识
-    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v7"
+    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v8"
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
@@ -165,7 +165,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     if hasattr(fedpcnn, 'device'):
         fedpcnn.device = device
 
-    fedpcnn.use_center_loss = True
+    fedpcnn.use_center_loss = False  # v8: 关闭 CenterLoss（v7 证明在极端不平衡下有害）
 
     print("\n开始训练...")
 
@@ -207,11 +207,9 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     if use_smote:
         pre_smote_labels = np.concatenate([y for _, y in client_data_list])
         pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
-        # Class-Balanced effective-number weights (GPT o3 建议)
-        # √逆频率权重（替代 CB effective-number，对极端不平衡更有区分度）
-        cb_weights = 1.0 / np.sqrt(pre_smote_counts)
-        cb_weights = cb_weights / cb_weights.sum() * n_classes
-        # 额外 cap 防止极端权重
+        # 简单逆频率权重（回退至历史最佳 378f261 配置）
+        # 1/counts 比 1/sqrt(counts) 对极端少数类（Worms=139）给予更强权重
+        cb_weights = 1.0 / pre_smote_counts
         cw_cap = 30.0 if n_classes > 5 else 15.0
         min_cw = cb_weights.min()
         cb_weights = np.clip(cb_weights, 0, min_cw * cw_cap)
@@ -983,7 +981,7 @@ if __name__ == '__main__':
                         help='随机种子（不指定则每次随机）')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='禁用CUDA（即使可用）')
-    parser.add_argument('--global-rounds', type=int, default=60,
+    parser.add_argument('--global-rounds', type=int, default=100,
                         help='全局训练轮次（降低lr后需更多轮次收敛）')
     parser.add_argument('--local-epochs', type=int, default=5,
                         help='本地训练轮次')
