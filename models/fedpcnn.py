@@ -1440,7 +1440,7 @@ class FedPCNN:
             proba = model.predict_proba(features_scaled)
             if proba.shape[1] < n_classes:
                 full_proba = np.zeros((len(features_scaled), n_classes))
-                full_proba[:, model_clone.classes_.astype(int)] = proba
+                full_proba[:, model.classes_.astype(int)] = proba
                 proba = full_proba
             meta_parts.append(proba)
         return np.hstack(meta_parts)

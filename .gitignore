@@ -12,7 +12,9 @@ data/
 !requirements.txt
 
 # Results (large/generated files)
-results/
+results/*
+!results/archive/
+!results/archive/**
 checkpoints/
 output.log
 

@@ -23,6 +23,18 @@ from utils.plot_utils import (
 logger = ResultLogger(results_dir='./results')
 
 
+def _normalize_exp_tag(exp_tag):
+    """标准化实验标签，避免空格等字符影响文件名。"""
+    if not exp_tag:
+        return None
+    return str(exp_tag).strip().replace(' ', '_')
+
+
+def _with_exp_suffix(base, exp_tag=None):
+    """为 checkpoint / 模型 / 结果文件追加实验标签。"""
+    return f"{base}_{exp_tag}" if exp_tag else base
+
+
 def set_seed(seed=42):
     """设置随机种子"""
     import random
@@ -119,13 +131,15 @@ def partition_data(X_train, y_train, partition_type='iid', num_clients=10, alpha
 
 def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device='cpu',
                 global_rounds=50, local_epochs=5, classification='multi',
-                dynamic_agg=False, bohb_trials=0):
+                dynamic_agg=False, bohb_trials=0, exp_tag=None):
     print("=" * 60)
     print("FedPCNN ")
     print("=" * 60)
 
+    exp_tag = _normalize_exp_tag(exp_tag)
+
     # 断点续训标识
-    ckpt_tag = f"{dataset_name}_{partition_type}_{classification}_v8"
+    ckpt_tag = _with_exp_suffix(f"{dataset_name}_{partition_type}_{classification}_v8", exp_tag)
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
@@ -259,7 +273,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
 
     # ── 训练完成，立即保存模型权重（防止后续步骤中断丢失） ──────────────
     import torch as _torch
-    tag = f"FedPCNN_{dataset_name}_{partition_type}_{classification}"
+    tag = _with_exp_suffix(f"FedPCNN_{dataset_name}_{partition_type}_{classification}", exp_tag)
     os.makedirs('./results/models', exist_ok=True)
     model_path = f"./results/models/{tag}_model.pt"
     model_state = {
@@ -332,6 +346,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         'lr': hp_lr,
         'classifier': best_path,
     }
+    if exp_tag:
+        save_params['exp_tag'] = exp_tag
     # 保存 BOHB 最优超参数
     if hasattr(fedpcnn, 'bohb_best_params'):
         save_params['bohb_best_params'] = fedpcnn.bohb_best_params
@@ -343,7 +359,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         alpha=alpha,
         metrics=metrics,
         params=save_params,
-        classification=classification
+        classification=classification,
+        filename_suffix=exp_tag,
     )
     print(f"\n实验结果已保存（评估阶段）")
 
@@ -446,7 +463,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
 
 def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=0.5, device='cpu',
                           global_rounds=50, local_epochs=5, classification='multi',
-                          dynamic_agg=True):
+                          dynamic_agg=True, exp_tag=None):
     """两阶段分类: Stage1(Normal vs Attack) → Stage2(9类攻击分类)
 
     将困难的 10 分类问题分解为两个子问题:
@@ -457,6 +474,8 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
     from sklearn.metrics import (confusion_matrix, precision_score,
                                  recall_score, f1_score)
     from data_preprocessing import apply_smote_per_client
+
+    exp_tag = _normalize_exp_tag(exp_tag)
 
     print("=" * 60)
     print("FedPCNN 两阶段分类: Stage1(二分类) → Stage2(9类攻击)")
@@ -547,7 +566,7 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
 
     # ── Stage1 训练完成，立即保存模型权重 ──────────────────────────────
     import torch as _torch
-    tag = f"FedPCNN_{dataset_name}_{partition_type}_{classification}_two_stage"
+    tag = _with_exp_suffix(f"FedPCNN_{dataset_name}_{partition_type}_{classification}_two_stage", exp_tag)
     os.makedirs('./results/models', exist_ok=True)
     _torch.save({
         'stage1_model': fedpcnn_s1.global_model.state_dict(),
@@ -727,22 +746,28 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
     # ═══════════════════════════════════════════════════════════════
     # 立即保存结果（先于绘图，防止绘图失败丢失结果）
     # ═══════════════════════════════════════════════════════════════
+    save_params = {
+        'num_devices': num_devices,
+        'global_rounds': global_rounds,
+        'local_epochs_s1': s1_epochs,
+        'local_epochs_s2': s2_epochs,
+        'batch_size': 256,
+        'lr_s1': s1_lr,
+        'lr_s2': s2_lr,
+        'classifier': 'two-stage CNN+SVM',
+    }
+    if exp_tag:
+        save_params['exp_tag'] = exp_tag
+
     logger.save_result(
         dataset=dataset_name,
         model_name='fedpcnn',
         partition=partition_type,
         alpha=alpha,
         metrics=metrics,
-        params={
-            'num_devices': num_devices,
-            'global_rounds': global_rounds,
-            'local_epochs_s1': s1_epochs,
-            'local_epochs_s2': s2_epochs,
-            'batch_size': 256,
-            'lr_s1': s1_lr, 'lr_s2': s2_lr,
-            'classifier': 'two-stage CNN+SVM',
-        },
-        classification=classification
+        params=save_params,
+        classification=classification,
+        filename_suffix=exp_tag,
     )
     print(f"\n实验结果已保存（评估阶段）")
 
@@ -793,10 +818,12 @@ def run_fedpcnn_two_stage(dataset_name='UNSW-NB15', partition_type='iid', alpha=
 
 
 def run_segmented_fl(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device='cpu',
-                     global_rounds=50, local_epochs=10, classification='multi'):
+                     global_rounds=50, local_epochs=10, classification='multi', exp_tag=None):
     print("=" * 60)
     print("分段式联邦学习实验")
     print("=" * 60)
+
+    exp_tag = _normalize_exp_tag(exp_tag)
 
     # 加载数据
     X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
@@ -891,7 +918,7 @@ def run_segmented_fl(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, de
     metrics = model.evaluate(X_test, y_test)
 
     #  可视化 
-    tag = f"SegmentedFL_{dataset_name}_{partition_type}_{classification}"
+    tag = _with_exp_suffix(f"SegmentedFL_{dataset_name}_{partition_type}_{classification}", exp_tag)
 
     # 1. 损失曲线（含验证）
     plot_loss_curves(
@@ -923,20 +950,25 @@ def run_segmented_fl(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, de
     )
 
     # 保存结果
+    save_params = {
+        'num_devices': num_devices,
+        'global_rounds': global_rounds,
+        'local_epochs': local_epochs,
+        'batch_size': 256,
+        'lr': 0.001
+    }
+    if exp_tag:
+        save_params['exp_tag'] = exp_tag
+
     logger.save_result(
         dataset=dataset_name,
         model_name='segmented',
         partition=partition_type,
         alpha=alpha,
         metrics=metrics,
-        params={
-            'num_devices': num_devices,
-            'global_rounds': global_rounds,
-            'local_epochs': local_epochs,
-            'batch_size': 256,
-            'lr': 0.001
-        },
-        classification=classification
+        params=save_params,
+        classification=classification,
+        filename_suffix=exp_tag,
     )
 
     # 3. 单模型指标对比图
@@ -992,6 +1024,8 @@ if __name__ == '__main__':
                         help='禁用动态聚合（默认禁用）')
     parser.add_argument('--bohb', type=int, default=0, metavar='N',
                         help='XGBoost BOHB超参搜索试验次数 (0=禁用, 推荐30)')
+    parser.add_argument('--exp-tag', type=str, default='',
+                        help='实验标签：用于区分结果文件、模型文件和checkpoint，避免多组实验互相覆盖')
 
     args = parser.parse_args()
 
@@ -1013,14 +1047,17 @@ if __name__ == '__main__':
             run_fedpcnn(args.dataset, args.partition, args.alpha, device,
                         args.global_rounds, args.local_epochs, args.classification,
                         dynamic_agg=not args.no_dynamic_agg,
-                        bohb_trials=args.bohb)
+                        bohb_trials=args.bohb,
+                        exp_tag=args.exp_tag or None)
         elif args.model == 'fedpcnn-2stage':
             run_fedpcnn_two_stage(args.dataset, args.partition, args.alpha, device,
                                   args.global_rounds, args.local_epochs, args.classification,
-                                  dynamic_agg=not args.no_dynamic_agg)
+                                  dynamic_agg=not args.no_dynamic_agg,
+                                  exp_tag=args.exp_tag or None)
         elif args.model == 'segmented':
             run_segmented_fl(args.dataset, args.partition, args.alpha, device,
-                             args.global_rounds, args.local_epochs, args.classification)
+                             args.global_rounds, args.local_epochs, args.classification,
+                             exp_tag=args.exp_tag or None)
     except Exception as e:
         print(f"\n 实验失败: {e}")
 

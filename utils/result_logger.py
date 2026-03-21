@@ -9,7 +9,7 @@ class ResultLogger:
         os.makedirs(results_dir, exist_ok=True)
 
     def save_result(self, dataset, model_name, partition, alpha, metrics, params,
-                    classification='multi'):
+                    classification='multi', filename_suffix=None):
         result = {
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'dataset': dataset,
@@ -21,7 +21,10 @@ class ResultLogger:
             'params': params
         }
 
-        filename = f"{dataset}_{model_name}_{partition}_{classification}_alpha{alpha}.json"
+        filename = f"{dataset}_{model_name}_{partition}_{classification}_alpha{alpha}"
+        if filename_suffix:
+            filename = f"{filename}_{filename_suffix}"
+        filename = f"{filename}.json"
         filepath = os.path.join(self.results_dir, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:
