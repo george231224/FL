@@ -1,0 +1,14 @@
+{
+  "source_result": "results/UNSW-NB15_fedpcnn_non-iid_multi_alpha0.5_smoke.json",
+  "plots": [
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_smoke_cm.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_smoke_comparison.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_smoke_loss.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_smoke_metrics.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_smoke_per_class.png"
+  ],
+  "models": [
+    "results/models/FedPCNN_UNSW-NB15_non-iid_multi_smoke_model.pt"
+  ],
+  "archived_at": "2026-03-21 23:02:34"
+}

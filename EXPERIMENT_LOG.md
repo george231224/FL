@@ -199,3 +199,27 @@
 | v6 (回退) | 78.90% | 59.60% | 7.11% | 1层CNN+20维+CB权重 |
 | v7 (权重未修) | 78.39% | 58.56% | 7.80% | 2层CNN+CenterLoss |
 | v8 (本次) | 78.84% | 59.84% | 7.29% | 1层CNN+38维+逆频率 |
+
+---
+
+## 云端实验记录（2026年3月21日）
+
+### UNSW-NB15 多分类 Non-IID smoke（远端流程验证）
+- 目的：验证云服务器环境、GPU训练、`--exp-tag` 产物隔离、图表归档流程
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：5轮, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `exp_tag=smoke`
+- 归档目录：`results/archive/2026-03-21_230201_smoke_2026-03-21_230234/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 78.48% |
+| Precision | 86.20% |
+| Recall | 78.48% |
+| F1-Score | 80.84% |
+| Macro-Precision | 57.36% |
+| Macro-Recall | 73.26% |
+| Macro-F1 | 59.64% |
+| FAR | 7.97% |
+
+结论：远端 4090 环境和完整实验归档流程已验证通过；5轮 smoke 结果落在近期多分类 Non-IID 区间内，可作为正式 `base60` / `bohb50` 实验前的环境基线。

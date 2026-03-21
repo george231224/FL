@@ -1,0 +1,27 @@
+{
+    "timestamp": "2026-03-21 23:02:01",
+    "dataset": "UNSW-NB15",
+    "model": "fedpcnn",
+    "partition": "non-iid",
+    "alpha": 0.5,
+    "classification": "multi",
+    "metrics": {
+        "Accuracy": 78.47870379353837,
+        "Precision": 86.20330689972195,
+        "Recall": 78.47870379353837,
+        "F1-Score": 80.83924607180853,
+        "Macro-Precision": 57.35628071836361,
+        "Macro-Recall": 73.25794947162998,
+        "Macro-F1": 59.6444119483601,
+        "FAR": 7.9669693971997635
+    },
+    "params": {
+        "num_devices": 10,
+        "global_rounds": 5,
+        "local_epochs": 5,
+        "batch_size": 256,
+        "lr": 0.005,
+        "classifier": "CNN+XGBoost(门限=0.33)",
+        "exp_tag": "smoke"
+    }
+}
