@@ -1,0 +1,1303 @@
+ 使用随机种子: 42
+使用设备: cpu
+============================================================
+FedPCNN 
+============================================================
+
+正在加载数据集: UNSW-NB15  分类模式: multi
+
+合并数据量: 257,673 行 (training-set: 82,332, testing-set: 175,341)
+原始特征维度: 39 (含类别列 proto/service/state)
+分类模式: 多分类 (Normal + 9种攻击)
+分层划分完成: 训练+验证 206,138  测试 51,535
+
+[MRMR] 特征选择 (贪心前向 + 离散MI + 累计阈值=0.95)
+  总特征: 39 (类别: 3, 连续: 36)
+  分箱数: 15
+  离散化完成: (206138, 39)
+  Relevance 统计: max=0.6919, mean=0.3024, min=0.0000
+     1. smean                 Rel=0.6919
+     2. sbytes                Rel=0.6076
+     3. service               Rel=0.4691
+     4. proto                 Rel=0.4613
+     5. sload                 Rel=0.4542
+     6. ct_dst_sport_ltm      Rel=0.4396
+     7. dload                 Rel=0.3956
+     8. ct_srv_dst            Rel=0.3948
+     9. sttl                  Rel=0.3941
+    10. rate                  Rel=0.3918
+  预计算 39×39 MI 矩阵...
+  MI 矩阵完成: max=1.8767
+
+  贪心 MRMR 排序 (共 39 个特征):
+     1. smean                 Rel=0.6919
+     2. sttl                  Rel=0.3941
+     3. ct_dst_sport_ltm      Rel=0.4396
+     4. service               Rel=0.4691
+     5. ct_srv_dst            Rel=0.3948
+     6. proto                 Rel=0.4613
+     7. ct_dst_ltm            Rel=0.3548
+     8. sbytes                Rel=0.6076
+     9. swin                  Rel=0.0000
+    10. dload                 Rel=0.3956
+    11. ct_src_dport_ltm      Rel=0.3849
+    12. dwin                  Rel=0.0000
+    13. sload                 Rel=0.4542
+    14. ct_srv_src            Rel=0.3793
+    15. response_body_len     Rel=0.0000
+    16. ct_state_ttl          Rel=0.2881
+    17. ct_src_ltm            Rel=0.2878
+    18. synack                Rel=0.3128
+    19. ct_dst_src_ltm        Rel=0.3610
+    20. is_sm_ips_ports       Rel=0.0000
+    21. dbytes                Rel=0.3722
+    22. trans_depth           Rel=0.0002
+    23. dinpkt                Rel=0.3906
+    24. ackdat                Rel=0.3082
+    25. dloss                 Rel=0.1798
+    26. rate                  Rel=0.3918
+    27. state                 Rel=0.3148
+    28. dttl                  Rel=0.1367
+    29. dmean                 Rel=0.3533
+    30. dur                   Rel=0.3759
+    31. tcprtt                Rel=0.3098
+    32. sloss                 Rel=0.2324
+    33. stcpb                 Rel=0.1887
+    34. sjit                  Rel=0.2315
+    35. dtcpb                 Rel=0.1887
+    36. spkts                 Rel=0.2864
+    37. djit                  Rel=0.2596
+    38. dpkts                 Rel=0.2790
+    39. sinpkt                Rel=0.3155
+
+  累计 Relevance 截断 (阈值=0.95):
+     1. smean                 Rel=0.6919  norm=0.0587  cumsum=0.0587
+     2. sttl                  Rel=0.3941  norm=0.0334  cumsum=0.0921
+     3. ct_dst_sport_ltm      Rel=0.4396  norm=0.0373  cumsum=0.1294
+     4. service               Rel=0.4691  norm=0.0398  cumsum=0.1692
+     5. ct_srv_dst            Rel=0.3948  norm=0.0335  cumsum=0.2026
+     6. proto                 Rel=0.4613  norm=0.0391  cumsum=0.2418
+     7. ct_dst_ltm            Rel=0.3548  norm=0.0301  cumsum=0.2718
+     8. sbytes                Rel=0.6076  norm=0.0515  cumsum=0.3234
+     9. swin                  Rel=0.0000  norm=0.0000  cumsum=0.3234
+    10. dload                 Rel=0.3956  norm=0.0336  cumsum=0.3569
+    11. ct_src_dport_ltm      Rel=0.3849  norm=0.0326  cumsum=0.3896
+    12. dwin                  Rel=0.0000  norm=0.0000  cumsum=0.3896
+    13. sload                 Rel=0.4542  norm=0.0385  cumsum=0.4281
+    14. ct_srv_src            Rel=0.3793  norm=0.0322  cumsum=0.4602
+    15. response_body_len     Rel=0.0000  norm=0.0000  cumsum=0.4602
+    16. ct_state_ttl          Rel=0.2881  norm=0.0244  cumsum=0.4847
+    17. ct_src_ltm            Rel=0.2878  norm=0.0244  cumsum=0.5091
+    18. synack                Rel=0.3128  norm=0.0265  cumsum=0.5356
+    19. ct_dst_src_ltm        Rel=0.3610  norm=0.0306  cumsum=0.5662
+    20. is_sm_ips_ports       Rel=0.0000  norm=0.0000  cumsum=0.5662
+    21. dbytes                Rel=0.3722  norm=0.0316  cumsum=0.5978
+    22. trans_depth           Rel=0.0002  norm=0.0000  cumsum=0.5978
+    23. dinpkt                Rel=0.3906  norm=0.0331  cumsum=0.6309
+    24. ackdat                Rel=0.3082  norm=0.0261  cumsum=0.6571
+    25. dloss                 Rel=0.1798  norm=0.0152  cumsum=0.6723
+    26. rate                  Rel=0.3918  norm=0.0332  cumsum=0.7055
+    27. state                 Rel=0.3148  norm=0.0267  cumsum=0.7322
+    28. dttl                  Rel=0.1367  norm=0.0116  cumsum=0.7438
+    29. dmean                 Rel=0.3533  norm=0.0300  cumsum=0.7738
+    30. dur                   Rel=0.3759  norm=0.0319  cumsum=0.8057
+    31. tcprtt                Rel=0.3098  norm=0.0263  cumsum=0.8319
+    32. sloss                 Rel=0.2324  norm=0.0197  cumsum=0.8517
+    33. stcpb                 Rel=0.1887  norm=0.0160  cumsum=0.8677
+    34. sjit                  Rel=0.2315  norm=0.0196  cumsum=0.8873
+    35. dtcpb                 Rel=0.1887  norm=0.0160  cumsum=0.9033
+    36. spkts                 Rel=0.2864  norm=0.0243  cumsum=0.9276
+    37. djit                  Rel=0.2596  norm=0.0220  cumsum=0.9496
+    38. dpkts                 Rel=0.2790  norm=0.0237  cumsum=0.9732  ← 截断
+    ... 剩余 1 个特征被截断
+
+[MRMR] 完成: 39 → 38 维 (累计Rel=0.9732)
+  类别特征: ['service', 'proto', 'state']
+  连续特征: ['smean', 'sttl', 'ct_dst_sport_ltm', 'ct_srv_dst', 'ct_dst_ltm', 'sbytes', 'swin', 'dload', 'ct_src_dport_ltm', 'dwin', 'sload', 'ct_srv_src', 'response_body_len', 'ct_state_ttl', 'ct_src_ltm', 'synack', 'ct_dst_src_ltm', 'is_sm_ips_ports', 'dbytes', 'trans_depth', 'dinpkt', 'ackdat', 'dloss', 'rate', 'dttl', 'dmean', 'dur', 'tcprtt', 'sloss', 'stcpb', 'sjit', 'dtcpb', 'spkts', 'djit', 'dpkts']
+
+[预处理] LabelEncoding + RobustScaler
+  连续特征: 35 列 (→ CNN)
+  类别特征: ['proto', 'service', 'state'] → LabelEncoding (→ XGBoost, 不进 CNN)
+  类别基数: {'proto': 133, 'service': 13, 'state': 10}
+  最终特征维度: 38 (连续: 35, 类别: 3)
+
+训练集类别分布:
+  normal          (0):  74400 (36.09%)
+  analysis        (1):   2142 (1.04%)
+  backdoor        (2):   1863 (0.90%)
+  dos             (3):  13082 (6.35%)
+  exploits        (4):  35620 (17.28%)
+  fuzzers         (5):  19397 (9.41%)
+  generic         (6):  47097 (22.85%)
+  reconnaissance  (7):  11189 (5.43%)
+  shellcode       (8):   1209 (0.59%)
+  worms           (9):    139 (0.07%)
+测试集类别分布:
+  normal          (0):  18600 (36.09%)
+  analysis        (1):    535 (1.04%)
+  backdoor        (2):    466 (0.90%)
+  dos             (3):   3271 (6.35%)
+  exploits        (4):   8905 (17.28%)
+  fuzzers         (5):   4849 (9.41%)
+  generic         (6):  11774 (22.85%)
+  reconnaissance  (7):   2798 (5.43%)
+  shellcode       (8):    302 (0.59%)
+  worms           (9):     35 (0.07%)
+数据集加载完成:
+  训练集: (206138, 38)
+  测试集: (51535, 38)
+  类别数: 10  ['Normal', 'Analysis', 'Backdoor', 'Dos', 'Exploits', 'Fuzzers', 'Generic', 'Reconnaissance', 'Shellcode', 'Worms']
+  特征数: 38 (连续: 35, OneHot: 3)
+
+训练/验证集划分:
+  训练集: (164910, 38)
+  验证集: (41228, 38)
+  测试集: (51535, 38)
+
+数据划分:
+  类型: NON-IID
+  客户端数: 10
+   Non-IID划分完成 (alpha=0.5)
+   Alpha越小，数据分布越不均衡
+
+  客户端数据分布:
+    客户端 0: 23057 样本, 类别分布 {0: 10397, 1: 10, 2: 404, 3: 3550, 4: 7, 5: 711, 6: 7701, 7: 12, 8: 249, 9: 16}
+    客户端 1: 22030 样本, 类别分布 {0: 7490, 1: 410, 2: 174, 3: 409, 4: 1826, 5: 6180, 6: 3089, 7: 2411, 8: 37, 9: 4}
+    客户端 2: 11723 样本, 类别分布 {0: 5122, 1: 16, 2: 34, 3: 1846, 4: 4121, 5: 155, 6: 370, 7: 37, 8: 19, 9: 3}
+    客户端 3: 11541 样本, 类别分布 {0: 793, 1: 171, 2: 91, 3: 482, 4: 2814, 5: 74, 6: 4218, 7: 2698, 8: 191, 9: 9}
+    客户端 4: 14557 样本, 类别分布 {0: 6047, 1: 533, 2: 5, 3: 1529, 4: 1151, 5: 1237, 6: 3895, 7: 47, 8: 95, 9: 18}
+    客户端 5: 11992 样本, 类别分布 {0: 6653, 1: 118, 2: 29, 3: 141, 4: 4006, 5: 307, 6: 500, 7: 79, 8: 133, 9: 26}
+    客户端 6: 21191 样本, 类别分布 {0: 12544, 1: 3, 2: 125, 3: 53, 4: 6806, 5: 2, 6: 1096, 7: 549, 8: 11, 9: 2}
+    客户端 7: 20308 样本, 类别分布 {0: 4167, 1: 242, 2: 325, 3: 38, 4: 4746, 5: 3915, 6: 4133, 7: 2653, 8: 86, 9: 3}
+    客户端 8: 20793 样本, 类别分布 {0: 3270, 1: 179, 2: 295, 3: 1853, 4: 3016, 5: 170, 6: 11521, 7: 343, 8: 142, 9: 4}
+    客户端 9:  7718 样本, 类别分布 {0: 3037, 1: 32, 2: 8, 3: 565, 4: 3, 5: 2767, 6: 1154, 7: 122, 8: 4, 9: 26}
+
+模型配置:
+  设备数: 10
+  输入形状: (1, 38)
+  类别数: 10
+  数据划分: NON-IID (alpha=0.5)
+FedPCNN初始化完成
+设备数: 10, 类别数: 10
+  CNN 输入: (1, 35) 1D (仅连续特征，类别特征 3 列不进 CNN)
+  特征维度: 128
+计算设备: cpu
+
+开始训练...
+
+[Borderline-SMOTE] 各客户端过采样结果（共10个）：
+  客户端 0 [Borderline-SMOTE]: 原{0: 10397, 1: 10, 2: 404, 3: 3550, 4: 7, 5: 711, 6: 7701, 7: 12, 8: 249, 9: 16} → 后{0: 10397, 1: 100, 2: 4040, 3: 17750, 4: 7, 5: 711, 6: 7701, 7: 60, 8: 7470, 9: 960}
+  客户端 1 [Borderline-SMOTE]: 原{0: 7490, 1: 410, 2: 174, 3: 409, 4: 1826, 5: 6180, 6: 3089, 7: 2411, 8: 37, 9: 4} → 后{0: 7490, 1: 4100, 2: 1740, 3: 2045, 4: 1826, 5: 6180, 6: 3089, 7: 12055, 8: 1110, 9: 4}
+  客户端 2 [Borderline-SMOTE]: 原{0: 5122, 1: 16, 2: 34, 3: 1846, 4: 4121, 5: 155, 6: 370, 7: 37, 8: 19, 9: 3} → 后{0: 5122, 1: 160, 2: 340, 3: 9230, 4: 4121, 5: 155, 6: 370, 7: 185, 8: 570, 9: 3}
+  客户端 3 [Borderline-SMOTE]: 原{0: 793, 1: 171, 2: 91, 3: 482, 4: 2814, 5: 74, 6: 4218, 7: 2698, 8: 191, 9: 9} → 后{0: 793, 1: 1710, 2: 910, 3: 2410, 4: 2814, 5: 74, 6: 4218, 7: 12654, 8: 5730, 9: 540}
+  客户端 4 [Borderline-SMOTE]: 原{0: 6047, 1: 533, 2: 5, 3: 1529, 4: 1151, 5: 1237, 6: 3895, 7: 47, 8: 95, 9: 18} → 后{0: 6047, 1: 5330, 2: 50, 3: 7645, 4: 1151, 5: 1237, 6: 3895, 7: 235, 8: 2850, 9: 1080}
+  ... （省略其余 5 个客户端）
+
+  配置 (UNSW-NB15):
+    lr=0.005, mu=0.05, local_epochs=5, gamma=0.3, focal_gamma=1.5
+    SMOTE=ON, cRT=ON, Logit校准=ON, 动态聚合=OFF
+
+============================================================
+开始FedPCNN训练
+============================================================
+
+使用外部预划分的客户端数据...
+
+预构建客户端数据集到设备...
+  全局类别权重(SMOTE前): {0: 0.07100000232458115, 1: 2.130000114440918, 2: 2.130000114440918, 3: 0.40400001406669617, 4: 0.14800000190734863, 5: 0.2720000147819519, 6: 0.1120000034570694, 7: 0.47200000286102295, 8: 2.130000114440918, 9: 2.130000114440918}
+
+Step 3-4: 开始100轮全局训练...
+  聚合方式: 标准FedAvg (p_k = n_k/n)
+  验证集: 41228 样本，每 5 轮评估一次
+  Center Loss: OFF (set model.use_center_loss=True to enable)
+  全局lr衰减: 余弦退火 0.005 → 0.00050
+
+  无 checkpoint，从头训练 (将保存到 /root/FL-optimize/models/../checkpoints/UNSW-NB15_non-iid_multi_v8_fl.pt)
+Global:   0%|          | 0/100 [00:00<?, ?epoch/s]                                                    Epoch   1/100 | t_loss=1.8385 t_acc=9.8% | v_loss=0.5195 v_acc=5.6% *
+Global:   0%|          | 0/100 [01:20<?, ?epoch/s, t_loss=1.8385 t_acc=9.8% v_loss=0.5195 v_acc=5.6% *]Global:   1%|          | 1/100 [01:20<2:12:43, 80.44s/epoch, t_loss=1.8385 t_acc=9.8% v_loss=0.5195 v_acc=5.6% *]Global:   1%|          | 1/100 [01:20<2:12:43, 80.44s/epoch, t_loss=1.8385 t_acc=9.8% v_loss=0.5195 v_acc=5.6% *]                                                                                                                   Epoch   2/100 | t_loss=1.0880 t_acc=11.2% | v_loss=0.5123 v_acc=1.0% *
+Global:   1%|          | 1/100 [02:38<2:12:43, 80.44s/epoch, t_loss=1.0880 t_acc=11.2% v_loss=0.5123 v_acc=1.0% *]Global:   2%|▏         | 2/100 [02:38<2:09:29, 79.28s/epoch, t_loss=1.0880 t_acc=11.2% v_loss=0.5123 v_acc=1.0% *]Global:   2%|▏         | 2/100 [02:38<2:09:29, 79.28s/epoch, t_loss=1.0880 t_acc=11.2% v_loss=0.5123 v_acc=1.0% *]                                                                                                                    Epoch   3/100 | t_loss=1.0517 t_acc=13.1% | v_loss=0.5523 v_acc=2.5% *
+Global:   2%|▏         | 2/100 [03:56<2:09:29, 79.28s/epoch, t_loss=1.0517 t_acc=13.1% v_loss=0.5523 v_acc=2.5% *]Global:   3%|▎         | 3/100 [03:56<2:07:01, 78.57s/epoch, t_loss=1.0517 t_acc=13.1% v_loss=0.5523 v_acc=2.5% *]Global:   3%|▎         | 3/100 [03:56<2:07:01, 78.57s/epoch, t_loss=1.0517 t_acc=13.1% v_loss=0.5523 v_acc=2.5% *]                                                                                                                    Epoch   4/100 | t_loss=1.0258 t_acc=13.7% | v_loss=0.5460 v_acc=2.7% *
+Global:   3%|▎         | 3/100 [05:08<2:07:01, 78.57s/epoch, t_loss=1.0258 t_acc=13.7% v_loss=0.5460 v_acc=2.7% *]Global:   4%|▍         | 4/100 [05:08<2:01:19, 75.83s/epoch, t_loss=1.0258 t_acc=13.7% v_loss=0.5460 v_acc=2.7% *]Global:   4%|▍         | 4/100 [05:08<2:01:19, 75.83s/epoch, t_loss=1.0258 t_acc=13.7% v_loss=0.5460 v_acc=2.7% *]                                                                                                                    Epoch   5/100 | t_loss=1.1130 t_acc=12.2% | v_loss=0.4639 v_acc=3.6% *
+Global:   4%|▍         | 4/100 [06:24<2:01:19, 75.83s/epoch, t_loss=1.1130 t_acc=12.2% v_loss=0.4639 v_acc=3.6% *]Global:   5%|▌         | 5/100 [06:24<2:00:28, 76.09s/epoch, t_loss=1.1130 t_acc=12.2% v_loss=0.4639 v_acc=3.6% *]Global:   5%|▌         | 5/100 [06:24<2:00:28, 76.09s/epoch, t_loss=1.1130 t_acc=12.2% v_loss=0.4639 v_acc=3.6% *]                                                                                                                    Epoch   6/100 | t_loss=1.1027 t_acc=14.8% | v_loss=0.4919 v_acc=3.2%
+Global:   5%|▌         | 5/100 [07:38<2:00:28, 76.09s/epoch, t_loss=1.1027 t_acc=14.8% v_loss=0.4919 v_acc=3.2%]Global:   6%|▌         | 6/100 [07:38<1:57:49, 75.21s/epoch, t_loss=1.1027 t_acc=14.8% v_loss=0.4919 v_acc=3.2%]Global:   6%|▌         | 6/100 [07:38<1:57:49, 75.21s/epoch, t_loss=1.1027 t_acc=14.8% v_loss=0.4919 v_acc=3.2%]                                                                                                                  Epoch   7/100 | t_loss=1.0806 t_acc=12.9% | v_loss=0.5712 v_acc=1.0%
+Global:   6%|▌         | 6/100 [08:54<1:57:49, 75.21s/epoch, t_loss=1.0806 t_acc=12.9% v_loss=0.5712 v_acc=1.0%]Global:   7%|▋         | 7/100 [08:54<1:57:17, 75.67s/epoch, t_loss=1.0806 t_acc=12.9% v_loss=0.5712 v_acc=1.0%]Global:   7%|▋         | 7/100 [08:54<1:57:17, 75.67s/epoch, t_loss=1.0806 t_acc=12.9% v_loss=0.5712 v_acc=1.0%]                                                                                                                  Epoch   8/100 | t_loss=1.1646 t_acc=16.2% | v_loss=0.5929 v_acc=2.1%
+Global:   7%|▋         | 7/100 [10:05<1:57:17, 75.67s/epoch, t_loss=1.1646 t_acc=16.2% v_loss=0.5929 v_acc=2.1%]Global:   8%|▊         | 8/100 [10:05<1:53:42, 74.16s/epoch, t_loss=1.1646 t_acc=16.2% v_loss=0.5929 v_acc=2.1%]Global:   8%|▊         | 8/100 [10:05<1:53:42, 74.16s/epoch, t_loss=1.1646 t_acc=16.2% v_loss=0.5929 v_acc=2.1%]                                                                                                                  Epoch   9/100 | t_loss=0.9133 t_acc=15.1% | v_loss=0.5183 v_acc=2.0%
+Global:   8%|▊         | 8/100 [11:17<1:53:42, 74.16s/epoch, t_loss=0.9133 t_acc=15.1% v_loss=0.5183 v_acc=2.0%]Global:   9%|▉         | 9/100 [11:17<1:51:20, 73.41s/epoch, t_loss=0.9133 t_acc=15.1% v_loss=0.5183 v_acc=2.0%]Global:   9%|▉         | 9/100 [11:17<1:51:20, 73.41s/epoch, t_loss=0.9133 t_acc=15.1% v_loss=0.5183 v_acc=2.0%]                                                                                                                  Epoch  10/100 | t_loss=0.9085 t_acc=14.9% | v_loss=0.4780 v_acc=1.6%
+Global:   9%|▉         | 9/100 [13:15<1:51:20, 73.41s/epoch, t_loss=0.9085 t_acc=14.9% v_loss=0.4780 v_acc=1.6%]Global:  10%|█         | 10/100 [13:15<2:10:40, 87.12s/epoch, t_loss=0.9085 t_acc=14.9% v_loss=0.4780 v_acc=1.6%]Global:  10%|█         | 10/100 [13:15<2:10:40, 87.12s/epoch, t_loss=0.9085 t_acc=14.9% v_loss=0.4780 v_acc=1.6%]                                                                                                                   Epoch  11/100 | t_loss=0.9039 t_acc=17.0% | v_loss=0.5099 v_acc=2.4%
+Global:  10%|█         | 10/100 [14:27<2:10:40, 87.12s/epoch, t_loss=0.9039 t_acc=17.0% v_loss=0.5099 v_acc=2.4%]Global:  11%|█         | 11/100 [14:27<2:02:29, 82.58s/epoch, t_loss=0.9039 t_acc=17.0% v_loss=0.5099 v_acc=2.4%]Global:  11%|█         | 11/100 [14:27<2:02:29, 82.58s/epoch, t_loss=0.9039 t_acc=17.0% v_loss=0.5099 v_acc=2.4%]                                                                                                                   Epoch  12/100 | t_loss=1.1741 t_acc=18.2% | v_loss=0.4828 v_acc=6.2%
+Global:  11%|█         | 11/100 [15:39<2:02:29, 82.58s/epoch, t_loss=1.1741 t_acc=18.2% v_loss=0.4828 v_acc=6.2%]Global:  12%|█▏        | 12/100 [15:39<1:56:08, 79.19s/epoch, t_loss=1.1741 t_acc=18.2% v_loss=0.4828 v_acc=6.2%]Global:  12%|█▏        | 12/100 [15:39<1:56:08, 79.19s/epoch, t_loss=1.1741 t_acc=18.2% v_loss=0.4828 v_acc=6.2%]                                                                                                                   Epoch  13/100 | t_loss=1.1381 t_acc=17.8% | v_loss=0.5731 v_acc=2.2%
+Global:  12%|█▏        | 12/100 [16:55<1:56:08, 79.19s/epoch, t_loss=1.1381 t_acc=17.8% v_loss=0.5731 v_acc=2.2%]Global:  13%|█▎        | 13/100 [16:55<1:53:38, 78.37s/epoch, t_loss=1.1381 t_acc=17.8% v_loss=0.5731 v_acc=2.2%]Global:  13%|█▎        | 13/100 [16:55<1:53:38, 78.37s/epoch, t_loss=1.1381 t_acc=17.8% v_loss=0.5731 v_acc=2.2%]                                                                                                                   Epoch  14/100 | t_loss=1.1623 t_acc=17.7% | v_loss=0.5956 v_acc=2.2%
+Global:  13%|█▎        | 13/100 [18:03<1:53:38, 78.37s/epoch, t_loss=1.1623 t_acc=17.7% v_loss=0.5956 v_acc=2.2%]Global:  14%|█▍        | 14/100 [18:03<1:47:52, 75.27s/epoch, t_loss=1.1623 t_acc=17.7% v_loss=0.5956 v_acc=2.2%]Global:  14%|█▍        | 14/100 [18:03<1:47:52, 75.27s/epoch, t_loss=1.1623 t_acc=17.7% v_loss=0.5956 v_acc=2.2%]                                                                                                                   Epoch  15/100 | t_loss=0.9671 t_acc=17.7% | v_loss=0.4648 v_acc=3.5%
+Global:  14%|█▍        | 14/100 [19:12<1:47:52, 75.27s/epoch, t_loss=0.9671 t_acc=17.7% v_loss=0.4648 v_acc=3.5%]Global:  15%|█▌        | 15/100 [19:12<1:43:58, 73.40s/epoch, t_loss=0.9671 t_acc=17.7% v_loss=0.4648 v_acc=3.5%]Global:  15%|█▌        | 15/100 [19:12<1:43:58, 73.40s/epoch, t_loss=0.9671 t_acc=17.7% v_loss=0.4648 v_acc=3.5%]                                                                                                                   Epoch  16/100 | t_loss=1.1608 t_acc=19.1% | v_loss=0.4665 v_acc=6.2%
+Global:  15%|█▌        | 15/100 [20:30<1:43:58, 73.40s/epoch, t_loss=1.1608 t_acc=19.1% v_loss=0.4665 v_acc=6.2%]Global:  16%|█▌        | 16/100 [20:30<1:44:27, 74.62s/epoch, t_loss=1.1608 t_acc=19.1% v_loss=0.4665 v_acc=6.2%]Global:  16%|█▌        | 16/100 [20:30<1:44:27, 74.62s/epoch, t_loss=1.1608 t_acc=19.1% v_loss=0.4665 v_acc=6.2%]                                                                                                                   Epoch  17/100 | t_loss=0.8880 t_acc=16.6% | v_loss=0.5011 v_acc=1.8%
+Global:  16%|█▌        | 16/100 [21:49<1:44:27, 74.62s/epoch, t_loss=0.8880 t_acc=16.6% v_loss=0.5011 v_acc=1.8%]Global:  17%|█▋        | 17/100 [21:49<1:45:19, 76.14s/epoch, t_loss=0.8880 t_acc=16.6% v_loss=0.5011 v_acc=1.8%]Global:  17%|█▋        | 17/100 [21:49<1:45:19, 76.14s/epoch, t_loss=0.8880 t_acc=16.6% v_loss=0.5011 v_acc=1.8%]                                                                                                                   Epoch  18/100 | t_loss=1.0729 t_acc=15.4% | v_loss=0.5208 v_acc=1.5%
+Global:  17%|█▋        | 17/100 [22:55<1:45:19, 76.14s/epoch, t_loss=1.0729 t_acc=15.4% v_loss=0.5208 v_acc=1.5%]Global:  18%|█▊        | 18/100 [22:55<1:39:51, 73.07s/epoch, t_loss=1.0729 t_acc=15.4% v_loss=0.5208 v_acc=1.5%]Global:  18%|█▊        | 18/100 [22:55<1:39:51, 73.07s/epoch, t_loss=1.0729 t_acc=15.4% v_loss=0.5208 v_acc=1.5%]                                                                                                                   Epoch  19/100 | t_loss=0.9554 t_acc=17.9% | v_loss=0.4316 v_acc=3.8% *
+Global:  18%|█▊        | 18/100 [24:13<1:39:51, 73.07s/epoch, t_loss=0.9554 t_acc=17.9% v_loss=0.4316 v_acc=3.8% *]Global:  19%|█▉        | 19/100 [24:13<1:40:37, 74.54s/epoch, t_loss=0.9554 t_acc=17.9% v_loss=0.4316 v_acc=3.8% *]Global:  19%|█▉        | 19/100 [24:13<1:40:37, 74.54s/epoch, t_loss=0.9554 t_acc=17.9% v_loss=0.4316 v_acc=3.8% *]                                                                                                                     Epoch  20/100 | t_loss=1.0567 t_acc=18.7% | v_loss=0.5458 v_acc=2.4%
+Global:  19%|█▉        | 19/100 [25:31<1:40:37, 74.54s/epoch, t_loss=1.0567 t_acc=18.7% v_loss=0.5458 v_acc=2.4%]Global:  20%|██        | 20/100 [25:31<1:40:40, 75.51s/epoch, t_loss=1.0567 t_acc=18.7% v_loss=0.5458 v_acc=2.4%]Global:  20%|██        | 20/100 [25:31<1:40:40, 75.51s/epoch, t_loss=1.0567 t_acc=18.7% v_loss=0.5458 v_acc=2.4%]                                                                                                                   Epoch  21/100 | t_loss=0.8509 t_acc=18.5% | v_loss=0.4875 v_acc=2.4%
+Global:  20%|██        | 20/100 [26:41<1:40:40, 75.51s/epoch, t_loss=0.8509 t_acc=18.5% v_loss=0.4875 v_acc=2.4%]Global:  21%|██        | 21/100 [26:41<1:37:23, 73.97s/epoch, t_loss=0.8509 t_acc=18.5% v_loss=0.4875 v_acc=2.4%]Global:  21%|██        | 21/100 [26:41<1:37:23, 73.97s/epoch, t_loss=0.8509 t_acc=18.5% v_loss=0.4875 v_acc=2.4%]                                                                                                                   Epoch  22/100 | t_loss=1.0710 t_acc=18.9% | v_loss=0.5456 v_acc=2.4%
+Global:  21%|██        | 21/100 [27:49<1:37:23, 73.97s/epoch, t_loss=1.0710 t_acc=18.9% v_loss=0.5456 v_acc=2.4%]Global:  22%|██▏       | 22/100 [27:49<1:33:49, 72.17s/epoch, t_loss=1.0710 t_acc=18.9% v_loss=0.5456 v_acc=2.4%]Global:  22%|██▏       | 22/100 [27:49<1:33:49, 72.17s/epoch, t_loss=1.0710 t_acc=18.9% v_loss=0.5456 v_acc=2.4%]                                                                                                                   Epoch  23/100 | t_loss=0.8404 t_acc=22.9% | v_loss=0.4512 v_acc=13.5% *
+Global:  22%|██▏       | 22/100 [28:59<1:33:49, 72.17s/epoch, t_loss=0.8404 t_acc=22.9% v_loss=0.4512 v_acc=13.5% *]Global:  23%|██▎       | 23/100 [28:59<1:31:47, 71.53s/epoch, t_loss=0.8404 t_acc=22.9% v_loss=0.4512 v_acc=13.5% *]Global:  23%|██▎       | 23/100 [28:59<1:31:47, 71.53s/epoch, t_loss=0.8404 t_acc=22.9% v_loss=0.4512 v_acc=13.5% *]                                                                                                                      Epoch  24/100 | t_loss=1.1962 t_acc=19.3% | v_loss=0.4645 v_acc=6.3%
+Global:  23%|██▎       | 23/100 [30:10<1:31:47, 71.53s/epoch, t_loss=1.1962 t_acc=19.3% v_loss=0.4645 v_acc=6.3%]Global:  24%|██▍       | 24/100 [30:10<1:30:04, 71.11s/epoch, t_loss=1.1962 t_acc=19.3% v_loss=0.4645 v_acc=6.3%]Global:  24%|██▍       | 24/100 [30:10<1:30:04, 71.11s/epoch, t_loss=1.1962 t_acc=19.3% v_loss=0.4645 v_acc=6.3%]                                                                                                                   Epoch  25/100 | t_loss=1.5203 t_acc=22.2% | v_loss=0.4733 v_acc=24.3%
+Global:  24%|██▍       | 24/100 [31:24<1:30:04, 71.11s/epoch, t_loss=1.5203 t_acc=22.2% v_loss=0.4733 v_acc=24.3%]Global:  25%|██▌       | 25/100 [31:24<1:30:06, 72.09s/epoch, t_loss=1.5203 t_acc=22.2% v_loss=0.4733 v_acc=24.3%]Global:  25%|██▌       | 25/100 [31:24<1:30:06, 72.09s/epoch, t_loss=1.5203 t_acc=22.2% v_loss=0.4733 v_acc=24.3%]                                                                                                                    Epoch  26/100 | t_loss=1.2926 t_acc=13.0% | v_loss=0.4422 v_acc=5.4% *
+Global:  25%|██▌       | 25/100 [32:42<1:30:06, 72.09s/epoch, t_loss=1.2926 t_acc=13.0% v_loss=0.4422 v_acc=5.4% *]Global:  26%|██▌       | 26/100 [32:42<1:30:59, 73.78s/epoch, t_loss=1.2926 t_acc=13.0% v_loss=0.4422 v_acc=5.4% *]Global:  26%|██▌       | 26/100 [32:42<1:30:59, 73.78s/epoch, t_loss=1.2926 t_acc=13.0% v_loss=0.4422 v_acc=5.4% *]                                                                                                                     Epoch  27/100 | t_loss=0.9290 t_acc=14.8% | v_loss=0.5080 v_acc=1.3%
+Global:  26%|██▌       | 26/100 [34:00<1:30:59, 73.78s/epoch, t_loss=0.9290 t_acc=14.8% v_loss=0.5080 v_acc=1.3%]Global:  27%|██▋       | 27/100 [34:00<1:31:31, 75.22s/epoch, t_loss=0.9290 t_acc=14.8% v_loss=0.5080 v_acc=1.3%]Global:  27%|██▋       | 27/100 [34:00<1:31:31, 75.22s/epoch, t_loss=0.9290 t_acc=14.8% v_loss=0.5080 v_acc=1.3%]                                                                                                                   Epoch  28/100 | t_loss=1.0925 t_acc=15.2% | v_loss=0.5182 v_acc=1.6%
+Global:  27%|██▋       | 27/100 [35:13<1:31:31, 75.22s/epoch, t_loss=1.0925 t_acc=15.2% v_loss=0.5182 v_acc=1.6%]Global:  28%|██▊       | 28/100 [35:13<1:29:32, 74.62s/epoch, t_loss=1.0925 t_acc=15.2% v_loss=0.5182 v_acc=1.6%]Global:  28%|██▊       | 28/100 [35:13<1:29:32, 74.62s/epoch, t_loss=1.0925 t_acc=15.2% v_loss=0.5182 v_acc=1.6%]                                                                                                                   Epoch  29/100 | t_loss=1.1918 t_acc=19.4% | v_loss=0.4674 v_acc=6.2%
+Global:  28%|██▊       | 28/100 [36:28<1:29:32, 74.62s/epoch, t_loss=1.1918 t_acc=19.4% v_loss=0.4674 v_acc=6.2%]Global:  29%|██▉       | 29/100 [36:28<1:28:21, 74.67s/epoch, t_loss=1.1918 t_acc=19.4% v_loss=0.4674 v_acc=6.2%]Global:  29%|██▉       | 29/100 [36:28<1:28:21, 74.67s/epoch, t_loss=1.1918 t_acc=19.4% v_loss=0.4674 v_acc=6.2%]                                                                                                                   Epoch  30/100 | t_loss=1.0944 t_acc=19.3% | v_loss=0.5449 v_acc=2.5%
+Global:  29%|██▉       | 29/100 [37:47<1:28:21, 74.67s/epoch, t_loss=1.0944 t_acc=19.3% v_loss=0.5449 v_acc=2.5%]Global:  30%|███       | 30/100 [37:47<1:28:26, 75.81s/epoch, t_loss=1.0944 t_acc=19.3% v_loss=0.5449 v_acc=2.5%]Global:  30%|███       | 30/100 [37:47<1:28:26, 75.81s/epoch, t_loss=1.0944 t_acc=19.3% v_loss=0.5449 v_acc=2.5%]                                                                                                                   Epoch  31/100 | t_loss=1.4459 t_acc=24.7% | v_loss=0.4543 v_acc=29.3% *
+Global:  30%|███       | 30/100 [38:57<1:28:26, 75.81s/epoch, t_loss=1.4459 t_acc=24.7% v_loss=0.4543 v_acc=29.3% *]Global:  31%|███       | 31/100 [38:57<1:25:13, 74.11s/epoch, t_loss=1.4459 t_acc=24.7% v_loss=0.4543 v_acc=29.3% *]Global:  31%|███       | 31/100 [38:57<1:25:13, 74.11s/epoch, t_loss=1.4459 t_acc=24.7% v_loss=0.4543 v_acc=29.3% *]                                                                                                                      Epoch  32/100 | t_loss=0.9506 t_acc=18.2% | v_loss=0.4454 v_acc=3.8% *
+Global:  31%|███       | 31/100 [40:16<1:25:13, 74.11s/epoch, t_loss=0.9506 t_acc=18.2% v_loss=0.4454 v_acc=3.8% *]Global:  32%|███▏      | 32/100 [40:16<1:25:38, 75.57s/epoch, t_loss=0.9506 t_acc=18.2% v_loss=0.4454 v_acc=3.8% *]Global:  32%|███▏      | 32/100 [40:16<1:25:38, 75.57s/epoch, t_loss=0.9506 t_acc=18.2% v_loss=0.4454 v_acc=3.8% *]                                                                                                                     Epoch  33/100 | t_loss=1.1944 t_acc=13.5% | v_loss=0.4348 v_acc=5.8% *
+Global:  32%|███▏      | 32/100 [41:31<1:25:38, 75.57s/epoch, t_loss=1.1944 t_acc=13.5% v_loss=0.4348 v_acc=5.8% *]Global:  33%|███▎      | 33/100 [41:31<1:24:05, 75.31s/epoch, t_loss=1.1944 t_acc=13.5% v_loss=0.4348 v_acc=5.8% *]Global:  33%|███▎      | 33/100 [41:31<1:24:05, 75.31s/epoch, t_loss=1.1944 t_acc=13.5% v_loss=0.4348 v_acc=5.8% *]                                                                                                                     Epoch  34/100 | t_loss=1.0510 t_acc=19.0% | v_loss=0.5353 v_acc=2.4%
+Global:  33%|███▎      | 33/100 [42:47<1:24:05, 75.31s/epoch, t_loss=1.0510 t_acc=19.0% v_loss=0.5353 v_acc=2.4%]Global:  34%|███▍      | 34/100 [42:47<1:23:15, 75.69s/epoch, t_loss=1.0510 t_acc=19.0% v_loss=0.5353 v_acc=2.4%]Global:  34%|███▍      | 34/100 [42:47<1:23:15, 75.69s/epoch, t_loss=1.0510 t_acc=19.0% v_loss=0.5353 v_acc=2.4%]                                                                                                                   Epoch  35/100 | t_loss=1.4691 t_acc=23.8% | v_loss=0.4584 v_acc=27.3% *
+Global:  34%|███▍      | 34/100 [43:53<1:23:15, 75.69s/epoch, t_loss=1.4691 t_acc=23.8% v_loss=0.4584 v_acc=27.3% *]Global:  35%|███▌      | 35/100 [43:53<1:18:38, 72.60s/epoch, t_loss=1.4691 t_acc=23.8% v_loss=0.4584 v_acc=27.3% *]Global:  35%|███▌      | 35/100 [43:53<1:18:38, 72.60s/epoch, t_loss=1.4691 t_acc=23.8% v_loss=0.4584 v_acc=27.3% *]                                                                                                                      Epoch  36/100 | t_loss=0.8155 t_acc=25.6% | v_loss=0.4284 v_acc=17.7% *
+Global:  35%|███▌      | 35/100 [45:10<1:18:38, 72.60s/epoch, t_loss=0.8155 t_acc=25.6% v_loss=0.4284 v_acc=17.7% *]Global:  36%|███▌      | 36/100 [45:10<1:19:01, 74.09s/epoch, t_loss=0.8155 t_acc=25.6% v_loss=0.4284 v_acc=17.7% *]Global:  36%|███▌      | 36/100 [45:10<1:19:01, 74.09s/epoch, t_loss=0.8155 t_acc=25.6% v_loss=0.4284 v_acc=17.7% *]                                                                                                                      Epoch  37/100 | t_loss=0.9271 t_acc=18.2% | v_loss=0.4296 v_acc=3.8% *
+Global:  36%|███▌      | 36/100 [46:22<1:19:01, 74.09s/epoch, t_loss=0.9271 t_acc=18.2% v_loss=0.4296 v_acc=3.8% *]Global:  37%|███▋      | 37/100 [46:22<1:17:10, 73.50s/epoch, t_loss=0.9271 t_acc=18.2% v_loss=0.4296 v_acc=3.8% *]Global:  37%|███▋      | 37/100 [46:22<1:17:10, 73.50s/epoch, t_loss=0.9271 t_acc=18.2% v_loss=0.4296 v_acc=3.8% *]                                                                                                                     Epoch  38/100 | t_loss=1.3070 t_acc=12.3% | v_loss=0.4393 v_acc=5.1% *
+Global:  37%|███▋      | 37/100 [47:37<1:17:10, 73.50s/epoch, t_loss=1.3070 t_acc=12.3% v_loss=0.4393 v_acc=5.1% *]Global:  38%|███▊      | 38/100 [47:37<1:16:12, 73.75s/epoch, t_loss=1.3070 t_acc=12.3% v_loss=0.4393 v_acc=5.1% *]Global:  38%|███▊      | 38/100 [47:37<1:16:12, 73.75s/epoch, t_loss=1.3070 t_acc=12.3% v_loss=0.4393 v_acc=5.1% *]                                                                                                                     Epoch  39/100 | t_loss=0.9347 t_acc=21.1% | v_loss=0.4014 v_acc=10.0% *
+Global:  38%|███▊      | 38/100 [48:54<1:16:12, 73.75s/epoch, t_loss=0.9347 t_acc=21.1% v_loss=0.4014 v_acc=10.0% *]Global:  39%|███▉      | 39/100 [48:54<1:16:11, 74.94s/epoch, t_loss=0.9347 t_acc=21.1% v_loss=0.4014 v_acc=10.0% *]Global:  39%|███▉      | 39/100 [48:54<1:16:11, 74.94s/epoch, t_loss=0.9347 t_acc=21.1% v_loss=0.4014 v_acc=10.0% *]                                                                                                                      Epoch  40/100 | t_loss=1.4236 t_acc=24.4% | v_loss=0.4436 v_acc=28.0% *
+Global:  39%|███▉      | 39/100 [50:09<1:16:11, 74.94s/epoch, t_loss=1.4236 t_acc=24.4% v_loss=0.4436 v_acc=28.0% *]Global:  40%|████      | 40/100 [50:09<1:15:00, 75.01s/epoch, t_loss=1.4236 t_acc=24.4% v_loss=0.4436 v_acc=28.0% *]Global:  40%|████      | 40/100 [50:09<1:15:00, 75.01s/epoch, t_loss=1.4236 t_acc=24.4% v_loss=0.4436 v_acc=28.0% *]                                                                                                                      Epoch  41/100 | t_loss=0.9955 t_acc=18.4% | v_loss=0.4823 v_acc=6.3%
+Global:  40%|████      | 40/100 [51:27<1:15:00, 75.01s/epoch, t_loss=0.9955 t_acc=18.4% v_loss=0.4823 v_acc=6.3%]Global:  41%|████      | 41/100 [51:27<1:14:31, 75.80s/epoch, t_loss=0.9955 t_acc=18.4% v_loss=0.4823 v_acc=6.3%]Global:  41%|████      | 41/100 [51:27<1:14:31, 75.80s/epoch, t_loss=0.9955 t_acc=18.4% v_loss=0.4823 v_acc=6.3%]                                                                                                                   Epoch  42/100 | t_loss=0.8943 t_acc=22.3% | v_loss=0.4680 v_acc=15.1%
+Global:  41%|████      | 41/100 [52:34<1:14:31, 75.80s/epoch, t_loss=0.8943 t_acc=22.3% v_loss=0.4680 v_acc=15.1%]Global:  42%|████▏     | 42/100 [52:34<1:10:46, 73.22s/epoch, t_loss=0.8943 t_acc=22.3% v_loss=0.4680 v_acc=15.1%]Global:  42%|████▏     | 42/100 [52:34<1:10:46, 73.22s/epoch, t_loss=0.8943 t_acc=22.3% v_loss=0.4680 v_acc=15.1%]                                                                                                                    Epoch  43/100 | t_loss=1.4132 t_acc=25.6% | v_loss=0.4528 v_acc=30.2%
+Global:  42%|████▏     | 42/100 [53:48<1:10:46, 73.22s/epoch, t_loss=1.4132 t_acc=25.6% v_loss=0.4528 v_acc=30.2%]Global:  43%|████▎     | 43/100 [53:48<1:09:41, 73.37s/epoch, t_loss=1.4132 t_acc=25.6% v_loss=0.4528 v_acc=30.2%]Global:  43%|████▎     | 43/100 [53:48<1:09:41, 73.37s/epoch, t_loss=1.4132 t_acc=25.6% v_loss=0.4528 v_acc=30.2%]                                                                                                                    Epoch  44/100 | t_loss=0.8042 t_acc=26.2% | v_loss=0.4138 v_acc=19.0% *
+Global:  43%|████▎     | 43/100 [55:08<1:09:41, 73.37s/epoch, t_loss=0.8042 t_acc=26.2% v_loss=0.4138 v_acc=19.0% *]Global:  44%|████▍     | 44/100 [55:08<1:10:17, 75.32s/epoch, t_loss=0.8042 t_acc=26.2% v_loss=0.4138 v_acc=19.0% *]Global:  44%|████▍     | 44/100 [55:08<1:10:17, 75.32s/epoch, t_loss=0.8042 t_acc=26.2% v_loss=0.4138 v_acc=19.0% *]                                                                                                                      Epoch  45/100 | t_loss=0.9519 t_acc=22.9% | v_loss=0.3901 v_acc=13.7% *
+Global:  44%|████▍     | 44/100 [56:29<1:10:17, 75.32s/epoch, t_loss=0.9519 t_acc=22.9% v_loss=0.3901 v_acc=13.7% *]Global:  45%|████▌     | 45/100 [56:29<1:10:35, 77.01s/epoch, t_loss=0.9519 t_acc=22.9% v_loss=0.3901 v_acc=13.7% *]Global:  45%|████▌     | 45/100 [56:29<1:10:35, 77.01s/epoch, t_loss=0.9519 t_acc=22.9% v_loss=0.3901 v_acc=13.7% *]                                                                                                                      Epoch  46/100 | t_loss=1.0781 t_acc=25.5% | v_loss=0.4333 v_acc=13.6%
+Global:  45%|████▌     | 45/100 [57:46<1:10:35, 77.01s/epoch, t_loss=1.0781 t_acc=25.5% v_loss=0.4333 v_acc=13.6%]Global:  46%|████▌     | 46/100 [57:46<1:09:17, 76.99s/epoch, t_loss=1.0781 t_acc=25.5% v_loss=0.4333 v_acc=13.6%]Global:  46%|████▌     | 46/100 [57:46<1:09:17, 76.99s/epoch, t_loss=1.0781 t_acc=25.5% v_loss=0.4333 v_acc=13.6%]                                                                                                                    Epoch  47/100 | t_loss=1.4351 t_acc=25.4% | v_loss=0.4442 v_acc=30.1%
+Global:  46%|████▌     | 46/100 [58:58<1:09:17, 76.99s/epoch, t_loss=1.4351 t_acc=25.4% v_loss=0.4442 v_acc=30.1%]Global:  47%|████▋     | 47/100 [58:58<1:06:51, 75.69s/epoch, t_loss=1.4351 t_acc=25.4% v_loss=0.4442 v_acc=30.1%]Global:  47%|████▋     | 47/100 [58:58<1:06:51, 75.69s/epoch, t_loss=1.4351 t_acc=25.4% v_loss=0.4442 v_acc=30.1%]                                                                                                                    Epoch  48/100 | t_loss=0.9387 t_acc=20.6% | v_loss=0.4167 v_acc=8.2%
+Global:  47%|████▋     | 47/100 [1:00:16<1:06:51, 75.69s/epoch, t_loss=0.9387 t_acc=20.6% v_loss=0.4167 v_acc=8.2%]Global:  48%|████▊     | 48/100 [1:00:16<1:06:10, 76.36s/epoch, t_loss=0.9387 t_acc=20.6% v_loss=0.4167 v_acc=8.2%]Global:  48%|████▊     | 48/100 [1:00:16<1:06:10, 76.36s/epoch, t_loss=0.9387 t_acc=20.6% v_loss=0.4167 v_acc=8.2%]                                                                                                                     Epoch  49/100 | t_loss=1.0805 t_acc=26.1% | v_loss=0.4332 v_acc=14.6%
+Global:  48%|████▊     | 48/100 [1:01:31<1:06:10, 76.36s/epoch, t_loss=1.0805 t_acc=26.1% v_loss=0.4332 v_acc=14.6%]Global:  49%|████▉     | 49/100 [1:01:31<1:04:34, 75.96s/epoch, t_loss=1.0805 t_acc=26.1% v_loss=0.4332 v_acc=14.6%]Global:  49%|████▉     | 49/100 [1:01:31<1:04:34, 75.96s/epoch, t_loss=1.0805 t_acc=26.1% v_loss=0.4332 v_acc=14.6%]                                                                                                                      Epoch  50/100 | t_loss=0.8002 t_acc=19.3% | v_loss=0.4432 v_acc=3.4%
+Global:  49%|████▉     | 49/100 [1:02:43<1:04:34, 75.96s/epoch, t_loss=0.8002 t_acc=19.3% v_loss=0.4432 v_acc=3.4%]Global:  50%|█████     | 50/100 [1:02:43<1:02:18, 74.77s/epoch, t_loss=0.8002 t_acc=19.3% v_loss=0.4432 v_acc=3.4%]Global:  50%|█████     | 50/100 [1:02:43<1:02:18, 74.77s/epoch, t_loss=0.8002 t_acc=19.3% v_loss=0.4432 v_acc=3.4%]                                                                                                                     Epoch  51/100 | t_loss=1.3728 t_acc=25.2% | v_loss=0.4449 v_acc=30.1%
+Global:  50%|█████     | 50/100 [1:03:54<1:02:18, 74.77s/epoch, t_loss=1.3728 t_acc=25.2% v_loss=0.4449 v_acc=30.1%]Global:  51%|█████     | 51/100 [1:03:54<59:56, 73.39s/epoch, t_loss=1.3728 t_acc=25.2% v_loss=0.4449 v_acc=30.1%]  Global:  51%|█████     | 51/100 [1:03:54<59:56, 73.39s/epoch, t_loss=1.3728 t_acc=25.2% v_loss=0.4449 v_acc=30.1%]                                                                                                                    Epoch  52/100 | t_loss=1.4624 t_acc=25.6% | v_loss=0.4567 v_acc=30.8%
+Global:  51%|█████     | 51/100 [1:05:10<59:56, 73.39s/epoch, t_loss=1.4624 t_acc=25.6% v_loss=0.4567 v_acc=30.8%]Global:  52%|█████▏    | 52/100 [1:05:10<59:33, 74.45s/epoch, t_loss=1.4624 t_acc=25.6% v_loss=0.4567 v_acc=30.8%]Global:  52%|█████▏    | 52/100 [1:05:10<59:33, 74.45s/epoch, t_loss=1.4624 t_acc=25.6% v_loss=0.4567 v_acc=30.8%]                                                                                                                    Epoch  53/100 | t_loss=0.9923 t_acc=21.5% | v_loss=0.4737 v_acc=12.2%
+Global:  52%|█████▏    | 52/100 [1:06:27<59:33, 74.45s/epoch, t_loss=0.9923 t_acc=21.5% v_loss=0.4737 v_acc=12.2%]Global:  53%|█████▎    | 53/100 [1:06:27<58:53, 75.18s/epoch, t_loss=0.9923 t_acc=21.5% v_loss=0.4737 v_acc=12.2%]Global:  53%|█████▎    | 53/100 [1:06:27<58:53, 75.18s/epoch, t_loss=0.9923 t_acc=21.5% v_loss=0.4737 v_acc=12.2%]                                                                                                                    Epoch  54/100 | t_loss=1.0938 t_acc=25.5% | v_loss=0.4340 v_acc=15.3%
+Global:  53%|█████▎    | 53/100 [1:07:41<58:53, 75.18s/epoch, t_loss=1.0938 t_acc=25.5% v_loss=0.4340 v_acc=15.3%]Global:  54%|█████▍    | 54/100 [1:07:41<57:23, 74.85s/epoch, t_loss=1.0938 t_acc=25.5% v_loss=0.4340 v_acc=15.3%]Global:  54%|█████▍    | 54/100 [1:07:41<57:23, 74.85s/epoch, t_loss=1.0938 t_acc=25.5% v_loss=0.4340 v_acc=15.3%]                                                                                                                    Epoch  55/100 | t_loss=0.8097 t_acc=19.0% | v_loss=0.4536 v_acc=3.2%
+Global:  54%|█████▍    | 54/100 [1:08:55<57:23, 74.85s/epoch, t_loss=0.8097 t_acc=19.0% v_loss=0.4536 v_acc=3.2%]Global:  55%|█████▌    | 55/100 [1:08:55<55:49, 74.44s/epoch, t_loss=0.8097 t_acc=19.0% v_loss=0.4536 v_acc=3.2%]Global:  55%|█████▌    | 55/100 [1:08:55<55:49, 74.44s/epoch, t_loss=0.8097 t_acc=19.0% v_loss=0.4536 v_acc=3.2%]                                                                                                                   Epoch  56/100 | t_loss=1.0395 t_acc=19.2% | v_loss=0.5265 v_acc=2.6%
+Global:  55%|█████▌    | 55/100 [1:10:02<55:49, 74.44s/epoch, t_loss=1.0395 t_acc=19.2% v_loss=0.5265 v_acc=2.6%]Global:  56%|█████▌    | 56/100 [1:10:02<52:56, 72.19s/epoch, t_loss=1.0395 t_acc=19.2% v_loss=0.5265 v_acc=2.6%]Global:  56%|█████▌    | 56/100 [1:10:02<52:56, 72.19s/epoch, t_loss=1.0395 t_acc=19.2% v_loss=0.5265 v_acc=2.6%]                                                                                                                   Epoch  57/100 | t_loss=1.0008 t_acc=22.4% | v_loss=0.4833 v_acc=12.9%
+Global:  56%|█████▌    | 56/100 [1:11:15<52:56, 72.19s/epoch, t_loss=1.0008 t_acc=22.4% v_loss=0.4833 v_acc=12.9%]Global:  57%|█████▋    | 57/100 [1:11:15<52:00, 72.57s/epoch, t_loss=1.0008 t_acc=22.4% v_loss=0.4833 v_acc=12.9%]Global:  57%|█████▋    | 57/100 [1:11:15<52:00, 72.57s/epoch, t_loss=1.0008 t_acc=22.4% v_loss=0.4833 v_acc=12.9%]                                                                                                                    Epoch  58/100 | t_loss=1.0265 t_acc=22.5% | v_loss=0.4815 v_acc=13.1%
+Global:  57%|█████▋    | 57/100 [1:12:30<52:00, 72.57s/epoch, t_loss=1.0265 t_acc=22.5% v_loss=0.4815 v_acc=13.1%]Global:  58%|█████▊    | 58/100 [1:12:30<51:09, 73.08s/epoch, t_loss=1.0265 t_acc=22.5% v_loss=0.4815 v_acc=13.1%]Global:  58%|█████▊    | 58/100 [1:12:30<51:09, 73.08s/epoch, t_loss=1.0265 t_acc=22.5% v_loss=0.4815 v_acc=13.1%]                                                                                                                    Epoch  59/100 | t_loss=1.0384 t_acc=23.1% | v_loss=0.4832 v_acc=14.5%
+Global:  58%|█████▊    | 58/100 [1:13:40<51:09, 73.08s/epoch, t_loss=1.0384 t_acc=23.1% v_loss=0.4832 v_acc=14.5%]Global:  59%|█████▉    | 59/100 [1:13:40<49:17, 72.14s/epoch, t_loss=1.0384 t_acc=23.1% v_loss=0.4832 v_acc=14.5%]Global:  59%|█████▉    | 59/100 [1:13:40<49:17, 72.14s/epoch, t_loss=1.0384 t_acc=23.1% v_loss=0.4832 v_acc=14.5%]                                                                                                                    Epoch  60/100 | t_loss=0.8829 t_acc=24.3% | v_loss=0.4619 v_acc=18.7%
+Global:  59%|█████▉    | 59/100 [1:14:57<49:17, 72.14s/epoch, t_loss=0.8829 t_acc=24.3% v_loss=0.4619 v_acc=18.7%]Global:  60%|██████    | 60/100 [1:14:57<49:11, 73.80s/epoch, t_loss=0.8829 t_acc=24.3% v_loss=0.4619 v_acc=18.7%]Global:  60%|██████    | 60/100 [1:14:57<49:11, 73.80s/epoch, t_loss=0.8829 t_acc=24.3% v_loss=0.4619 v_acc=18.7%]                                                                                                                    Epoch  61/100 | t_loss=1.0663 t_acc=20.2% | v_loss=0.5280 v_acc=4.7%
+Global:  60%|██████    | 60/100 [1:15:59<49:11, 73.80s/epoch, t_loss=1.0663 t_acc=20.2% v_loss=0.5280 v_acc=4.7%]Global:  61%|██████    | 61/100 [1:15:59<45:41, 70.30s/epoch, t_loss=1.0663 t_acc=20.2% v_loss=0.5280 v_acc=4.7%]Global:  61%|██████    | 61/100 [1:15:59<45:41, 70.30s/epoch, t_loss=1.0663 t_acc=20.2% v_loss=0.5280 v_acc=4.7%]                                                                                                                   Epoch  62/100 | t_loss=1.0784 t_acc=25.1% | v_loss=0.4341 v_acc=12.7%
+Global:  61%|██████    | 61/100 [1:17:03<45:41, 70.30s/epoch, t_loss=1.0784 t_acc=25.1% v_loss=0.4341 v_acc=12.7%]Global:  62%|██████▏   | 62/100 [1:17:03<43:10, 68.16s/epoch, t_loss=1.0784 t_acc=25.1% v_loss=0.4341 v_acc=12.7%]Global:  62%|██████▏   | 62/100 [1:17:03<43:10, 68.16s/epoch, t_loss=1.0784 t_acc=25.1% v_loss=0.4341 v_acc=12.7%]                                                                                                                    Epoch  63/100 | t_loss=1.1326 t_acc=23.6% | v_loss=0.4384 v_acc=12.1%
+Global:  62%|██████▏   | 62/100 [1:18:13<43:10, 68.16s/epoch, t_loss=1.1326 t_acc=23.6% v_loss=0.4384 v_acc=12.1%]Global:  63%|██████▎   | 63/100 [1:18:13<42:30, 68.93s/epoch, t_loss=1.1326 t_acc=23.6% v_loss=0.4384 v_acc=12.1%]Global:  63%|██████▎   | 63/100 [1:18:13<42:30, 68.93s/epoch, t_loss=1.1326 t_acc=23.6% v_loss=0.4384 v_acc=12.1%]                                                                                                                    Epoch  64/100 | t_loss=1.0102 t_acc=24.9% | v_loss=0.4739 v_acc=17.5%
+Global:  63%|██████▎   | 63/100 [1:19:24<42:30, 68.93s/epoch, t_loss=1.0102 t_acc=24.9% v_loss=0.4739 v_acc=17.5%]Global:  64%|██████▍   | 64/100 [1:19:24<41:38, 69.39s/epoch, t_loss=1.0102 t_acc=24.9% v_loss=0.4739 v_acc=17.5%]Global:  64%|██████▍   | 64/100 [1:19:24<41:38, 69.39s/epoch, t_loss=1.0102 t_acc=24.9% v_loss=0.4739 v_acc=17.5%]                                                                                                                    Epoch  65/100 | t_loss=0.8718 t_acc=25.0% | v_loss=0.4461 v_acc=20.0%
+Global:  64%|██████▍   | 64/100 [1:20:31<41:38, 69.39s/epoch, t_loss=0.8718 t_acc=25.0% v_loss=0.4461 v_acc=20.0%]Global:  65%|██████▌   | 65/100 [1:20:31<40:09, 68.84s/epoch, t_loss=0.8718 t_acc=25.0% v_loss=0.4461 v_acc=20.0%]Global:  65%|██████▌   | 65/100 [1:20:31<40:09, 68.84s/epoch, t_loss=0.8718 t_acc=25.0% v_loss=0.4461 v_acc=20.0%]                                                                                                                    Epoch  66/100 | t_loss=1.0592 t_acc=26.9% | v_loss=0.4392 v_acc=15.0%
+Global:  65%|██████▌   | 65/100 [1:21:39<40:09, 68.84s/epoch, t_loss=1.0592 t_acc=26.9% v_loss=0.4392 v_acc=15.0%]Global:  66%|██████▌   | 66/100 [1:21:39<38:46, 68.43s/epoch, t_loss=1.0592 t_acc=26.9% v_loss=0.4392 v_acc=15.0%]Global:  66%|██████▌   | 66/100 [1:21:39<38:46, 68.43s/epoch, t_loss=1.0592 t_acc=26.9% v_loss=0.4392 v_acc=15.0%]                                                                                                                    Epoch  67/100 | t_loss=0.8799 t_acc=24.5% | v_loss=0.3827 v_acc=15.7% *
+Global:  66%|██████▌   | 66/100 [1:22:50<38:46, 68.43s/epoch, t_loss=0.8799 t_acc=24.5% v_loss=0.3827 v_acc=15.7% *]Global:  67%|██████▋   | 67/100 [1:22:50<38:01, 69.12s/epoch, t_loss=0.8799 t_acc=24.5% v_loss=0.3827 v_acc=15.7% *]Global:  67%|██████▋   | 67/100 [1:22:50<38:01, 69.12s/epoch, t_loss=0.8799 t_acc=24.5% v_loss=0.3827 v_acc=15.7% *]                                                                                                                      Epoch  68/100 | t_loss=1.0215 t_acc=21.0% | v_loss=0.5159 v_acc=5.6%
+Global:  67%|██████▋   | 67/100 [1:24:08<38:01, 69.12s/epoch, t_loss=1.0215 t_acc=21.0% v_loss=0.5159 v_acc=5.6%]Global:  68%|██████▊   | 68/100 [1:24:08<38:25, 72.06s/epoch, t_loss=1.0215 t_acc=21.0% v_loss=0.5159 v_acc=5.6%]Global:  68%|██████▊   | 68/100 [1:24:08<38:25, 72.06s/epoch, t_loss=1.0215 t_acc=21.0% v_loss=0.5159 v_acc=5.6%]                                                                                                                   Epoch  69/100 | t_loss=0.9467 t_acc=23.5% | v_loss=0.3886 v_acc=15.6% *
+Global:  68%|██████▊   | 68/100 [1:25:23<38:25, 72.06s/epoch, t_loss=0.9467 t_acc=23.5% v_loss=0.3886 v_acc=15.6% *]Global:  69%|██████▉   | 69/100 [1:25:23<37:36, 72.79s/epoch, t_loss=0.9467 t_acc=23.5% v_loss=0.3886 v_acc=15.6% *]Global:  69%|██████▉   | 69/100 [1:25:23<37:36, 72.79s/epoch, t_loss=0.9467 t_acc=23.5% v_loss=0.3886 v_acc=15.6% *]                                                                                                                      Epoch  70/100 | t_loss=1.3588 t_acc=26.5% | v_loss=0.4221 v_acc=31.6%
+Global:  69%|██████▉   | 69/100 [1:26:42<37:36, 72.79s/epoch, t_loss=1.3588 t_acc=26.5% v_loss=0.4221 v_acc=31.6%]Global:  70%|███████   | 70/100 [1:26:42<37:17, 74.59s/epoch, t_loss=1.3588 t_acc=26.5% v_loss=0.4221 v_acc=31.6%]Global:  70%|███████   | 70/100 [1:26:42<37:17, 74.59s/epoch, t_loss=1.3588 t_acc=26.5% v_loss=0.4221 v_acc=31.6%]                                                                                                                    Epoch  71/100 | t_loss=0.7748 t_acc=24.2% | v_loss=0.4294 v_acc=12.4%
+Global:  70%|███████   | 70/100 [1:28:19<37:17, 74.59s/epoch, t_loss=0.7748 t_acc=24.2% v_loss=0.4294 v_acc=12.4%]Global:  71%|███████   | 71/100 [1:28:19<39:18, 81.32s/epoch, t_loss=0.7748 t_acc=24.2% v_loss=0.4294 v_acc=12.4%]Global:  71%|███████   | 71/100 [1:28:19<39:18, 81.32s/epoch, t_loss=0.7748 t_acc=24.2% v_loss=0.4294 v_acc=12.4%]                                                                                                                    Epoch  72/100 | t_loss=0.7837 t_acc=24.8% | v_loss=0.4333 v_acc=13.1%
+Global:  71%|███████   | 71/100 [1:30:24<39:18, 81.32s/epoch, t_loss=0.7837 t_acc=24.8% v_loss=0.4333 v_acc=13.1%]Global:  72%|███████▏  | 72/100 [1:30:24<44:03, 94.42s/epoch, t_loss=0.7837 t_acc=24.8% v_loss=0.4333 v_acc=13.1%]Global:  72%|███████▏  | 72/100 [1:30:24<44:03, 94.42s/epoch, t_loss=0.7837 t_acc=24.8% v_loss=0.4333 v_acc=13.1%]                                                                                                                    Epoch  73/100 | t_loss=0.7599 t_acc=29.2% | v_loss=0.4085 v_acc=22.4%
+Global:  72%|███████▏  | 72/100 [1:31:38<44:03, 94.42s/epoch, t_loss=0.7599 t_acc=29.2% v_loss=0.4085 v_acc=22.4%]Global:  73%|███████▎  | 73/100 [1:31:38<39:50, 88.53s/epoch, t_loss=0.7599 t_acc=29.2% v_loss=0.4085 v_acc=22.4%]Global:  73%|███████▎  | 73/100 [1:31:38<39:50, 88.53s/epoch, t_loss=0.7599 t_acc=29.2% v_loss=0.4085 v_acc=22.4%]                                                                                                                    Epoch  74/100 | t_loss=0.8494 t_acc=24.8% | v_loss=0.4499 v_acc=19.6%
+Global:  73%|███████▎  | 73/100 [1:32:50<39:50, 88.53s/epoch, t_loss=0.8494 t_acc=24.8% v_loss=0.4499 v_acc=19.6%]Global:  74%|███████▍  | 74/100 [1:32:50<36:09, 83.45s/epoch, t_loss=0.8494 t_acc=24.8% v_loss=0.4499 v_acc=19.6%]Global:  74%|███████▍  | 74/100 [1:32:50<36:09, 83.45s/epoch, t_loss=0.8494 t_acc=24.8% v_loss=0.4499 v_acc=19.6%]                                                                                                                    Epoch  75/100 | t_loss=0.9827 t_acc=27.2% | v_loss=0.4686 v_acc=21.4%
+Global:  74%|███████▍  | 74/100 [1:33:59<36:09, 83.45s/epoch, t_loss=0.9827 t_acc=27.2% v_loss=0.4686 v_acc=21.4%]Global:  75%|███████▌  | 75/100 [1:33:59<32:57, 79.11s/epoch, t_loss=0.9827 t_acc=27.2% v_loss=0.4686 v_acc=21.4%]Global:  75%|███████▌  | 75/100 [1:33:59<32:57, 79.11s/epoch, t_loss=0.9827 t_acc=27.2% v_loss=0.4686 v_acc=21.4%]                                                                                                                    Epoch  76/100 | t_loss=1.1096 t_acc=22.1% | v_loss=0.3977 v_acc=21.5%
+Global:  75%|███████▌  | 75/100 [1:35:17<32:57, 79.11s/epoch, t_loss=1.1096 t_acc=22.1% v_loss=0.3977 v_acc=21.5%]Global:  76%|███████▌  | 76/100 [1:35:17<31:31, 78.81s/epoch, t_loss=1.1096 t_acc=22.1% v_loss=0.3977 v_acc=21.5%]Global:  76%|███████▌  | 76/100 [1:35:17<31:31, 78.81s/epoch, t_loss=1.1096 t_acc=22.1% v_loss=0.3977 v_acc=21.5%]                                                                                                                    Epoch  77/100 | t_loss=0.7555 t_acc=30.6% | v_loss=0.3979 v_acc=25.4%
+Global:  76%|███████▌  | 76/100 [1:36:37<31:31, 78.81s/epoch, t_loss=0.7555 t_acc=30.6% v_loss=0.3979 v_acc=25.4%]Global:  77%|███████▋  | 77/100 [1:36:37<30:16, 78.98s/epoch, t_loss=0.7555 t_acc=30.6% v_loss=0.3979 v_acc=25.4%]Global:  77%|███████▋  | 77/100 [1:36:37<30:16, 78.98s/epoch, t_loss=0.7555 t_acc=30.6% v_loss=0.3979 v_acc=25.4%]                                                                                                                    Epoch  78/100 | t_loss=0.9046 t_acc=26.6% | v_loss=0.3780 v_acc=20.3% *
+Global:  77%|███████▋  | 77/100 [1:37:52<30:16, 78.98s/epoch, t_loss=0.9046 t_acc=26.6% v_loss=0.3780 v_acc=20.3% *]Global:  78%|███████▊  | 78/100 [1:37:52<28:35, 77.96s/epoch, t_loss=0.9046 t_acc=26.6% v_loss=0.3780 v_acc=20.3% *]Global:  78%|███████▊  | 78/100 [1:37:52<28:35, 77.96s/epoch, t_loss=0.9046 t_acc=26.6% v_loss=0.3780 v_acc=20.3% *]                                                                                                                      Epoch  79/100 | t_loss=0.8776 t_acc=23.7% | v_loss=0.4044 v_acc=13.3%
+Global:  78%|███████▊  | 78/100 [1:39:11<28:35, 77.96s/epoch, t_loss=0.8776 t_acc=23.7% v_loss=0.4044 v_acc=13.3%]Global:  79%|███████▉  | 79/100 [1:39:11<27:22, 78.24s/epoch, t_loss=0.8776 t_acc=23.7% v_loss=0.4044 v_acc=13.3%]Global:  79%|███████▉  | 79/100 [1:39:11<27:22, 78.24s/epoch, t_loss=0.8776 t_acc=23.7% v_loss=0.4044 v_acc=13.3%]                                                                                                                    Epoch  80/100 | t_loss=0.9831 t_acc=20.0% | v_loss=0.4971 v_acc=3.5%
+Global:  79%|███████▉  | 79/100 [1:40:29<27:22, 78.24s/epoch, t_loss=0.9831 t_acc=20.0% v_loss=0.4971 v_acc=3.5%]Global:  80%|████████  | 80/100 [1:40:29<26:04, 78.23s/epoch, t_loss=0.9831 t_acc=20.0% v_loss=0.4971 v_acc=3.5%]Global:  80%|████████  | 80/100 [1:40:29<26:04, 78.23s/epoch, t_loss=0.9831 t_acc=20.0% v_loss=0.4971 v_acc=3.5%]                                                                                                                   Epoch  81/100 | t_loss=0.9233 t_acc=27.6% | v_loss=0.3803 v_acc=22.8% *
+Global:  80%|████████  | 80/100 [1:41:49<26:04, 78.23s/epoch, t_loss=0.9233 t_acc=27.6% v_loss=0.3803 v_acc=22.8% *]Global:  81%|████████  | 81/100 [1:41:49<24:56, 78.77s/epoch, t_loss=0.9233 t_acc=27.6% v_loss=0.3803 v_acc=22.8% *]Global:  81%|████████  | 81/100 [1:41:49<24:56, 78.77s/epoch, t_loss=0.9233 t_acc=27.6% v_loss=0.3803 v_acc=22.8% *]                                                                                                                      Epoch  82/100 | t_loss=0.9390 t_acc=28.2% | v_loss=0.3805 v_acc=23.7% *
+Global:  81%|████████  | 81/100 [1:43:08<24:56, 78.77s/epoch, t_loss=0.9390 t_acc=28.2% v_loss=0.3805 v_acc=23.7% *]Global:  82%|████████▏ | 82/100 [1:43:08<23:40, 78.89s/epoch, t_loss=0.9390 t_acc=28.2% v_loss=0.3805 v_acc=23.7% *]Global:  82%|████████▏ | 82/100 [1:43:08<23:40, 78.89s/epoch, t_loss=0.9390 t_acc=28.2% v_loss=0.3805 v_acc=23.7% *]                                                                                                                      Epoch  83/100 | t_loss=0.8134 t_acc=24.5% | v_loss=0.4333 v_acc=19.1%
+Global:  82%|████████▏ | 82/100 [1:44:28<23:40, 78.89s/epoch, t_loss=0.8134 t_acc=24.5% v_loss=0.4333 v_acc=19.1%]Global:  83%|████████▎ | 83/100 [1:44:28<22:24, 79.11s/epoch, t_loss=0.8134 t_acc=24.5% v_loss=0.4333 v_acc=19.1%]Global:  83%|████████▎ | 83/100 [1:44:28<22:24, 79.11s/epoch, t_loss=0.8134 t_acc=24.5% v_loss=0.4333 v_acc=19.1%]                                                                                                                    Epoch  84/100 | t_loss=1.2900 t_acc=26.3% | v_loss=0.4181 v_acc=31.1%
+Global:  83%|████████▎ | 83/100 [1:45:42<22:24, 79.11s/epoch, t_loss=1.2900 t_acc=26.3% v_loss=0.4181 v_acc=31.1%]Global:  84%|████████▍ | 84/100 [1:45:42<20:39, 77.50s/epoch, t_loss=1.2900 t_acc=26.3% v_loss=0.4181 v_acc=31.1%]Global:  84%|████████▍ | 84/100 [1:45:42<20:39, 77.50s/epoch, t_loss=1.2900 t_acc=26.3% v_loss=0.4181 v_acc=31.1%]                                                                                                                    Epoch  85/100 | t_loss=0.9363 t_acc=27.9% | v_loss=0.4557 v_acc=22.9%
+Global:  84%|████████▍ | 84/100 [1:47:03<20:39, 77.50s/epoch, t_loss=0.9363 t_acc=27.9% v_loss=0.4557 v_acc=22.9%]Global:  85%|████████▌ | 85/100 [1:47:03<19:36, 78.46s/epoch, t_loss=0.9363 t_acc=27.9% v_loss=0.4557 v_acc=22.9%]Global:  85%|████████▌ | 85/100 [1:47:03<19:36, 78.46s/epoch, t_loss=0.9363 t_acc=27.9% v_loss=0.4557 v_acc=22.9%]                                                                                                                    Epoch  86/100 | t_loss=0.8889 t_acc=25.7% | v_loss=0.3740 v_acc=19.3% *
+Global:  85%|████████▌ | 85/100 [1:48:13<19:36, 78.46s/epoch, t_loss=0.8889 t_acc=25.7% v_loss=0.3740 v_acc=19.3% *]Global:  86%|████████▌ | 86/100 [1:48:13<17:46, 76.15s/epoch, t_loss=0.8889 t_acc=25.7% v_loss=0.3740 v_acc=19.3% *]Global:  86%|████████▌ | 86/100 [1:48:13<17:46, 76.15s/epoch, t_loss=0.8889 t_acc=25.7% v_loss=0.3740 v_acc=19.3% *]                                                                                                                      Epoch  87/100 | t_loss=1.3140 t_acc=26.2% | v_loss=0.4064 v_acc=30.9%
+Global:  86%|████████▌ | 86/100 [1:49:33<17:46, 76.15s/epoch, t_loss=1.3140 t_acc=26.2% v_loss=0.4064 v_acc=30.9%]Global:  87%|████████▋ | 87/100 [1:49:33<16:42, 77.09s/epoch, t_loss=1.3140 t_acc=26.2% v_loss=0.4064 v_acc=30.9%]Global:  87%|████████▋ | 87/100 [1:49:33<16:42, 77.09s/epoch, t_loss=1.3140 t_acc=26.2% v_loss=0.4064 v_acc=30.9%]                                                                                                                    Epoch  88/100 | t_loss=0.9251 t_acc=28.7% | v_loss=0.3746 v_acc=24.2% *
+Global:  87%|████████▋ | 87/100 [1:50:52<16:42, 77.09s/epoch, t_loss=0.9251 t_acc=28.7% v_loss=0.3746 v_acc=24.2% *]Global:  88%|████████▊ | 88/100 [1:50:52<15:33, 77.80s/epoch, t_loss=0.9251 t_acc=28.7% v_loss=0.3746 v_acc=24.2% *]Global:  88%|████████▊ | 88/100 [1:50:52<15:33, 77.80s/epoch, t_loss=0.9251 t_acc=28.7% v_loss=0.3746 v_acc=24.2% *]                                                                                                                      Epoch  89/100 | t_loss=0.7674 t_acc=27.8% | v_loss=0.4184 v_acc=19.0%
+Global:  88%|████████▊ | 88/100 [1:52:12<15:33, 77.80s/epoch, t_loss=0.7674 t_acc=27.8% v_loss=0.4184 v_acc=19.0%]Global:  89%|████████▉ | 89/100 [1:52:12<14:23, 78.49s/epoch, t_loss=0.7674 t_acc=27.8% v_loss=0.4184 v_acc=19.0%]Global:  89%|████████▉ | 89/100 [1:52:12<14:23, 78.49s/epoch, t_loss=0.7674 t_acc=27.8% v_loss=0.4184 v_acc=19.0%]                                                                                                                    Epoch  90/100 | t_loss=0.7703 t_acc=30.1% | v_loss=0.4197 v_acc=22.8%
+Global:  89%|████████▉ | 89/100 [1:53:25<14:23, 78.49s/epoch, t_loss=0.7703 t_acc=30.1% v_loss=0.4197 v_acc=22.8%]Global:  90%|█████████ | 90/100 [1:53:25<12:47, 76.74s/epoch, t_loss=0.7703 t_acc=30.1% v_loss=0.4197 v_acc=22.8%]Global:  90%|█████████ | 90/100 [1:53:25<12:47, 76.74s/epoch, t_loss=0.7703 t_acc=30.1% v_loss=0.4197 v_acc=22.8%]                                                                                                                    Epoch  91/100 | t_loss=0.8670 t_acc=23.0% | v_loss=0.4059 v_acc=11.6%
+Global:  90%|█████████ | 90/100 [1:54:38<12:47, 76.74s/epoch, t_loss=0.8670 t_acc=23.0% v_loss=0.4059 v_acc=11.6%]Global:  91%|█████████ | 91/100 [1:54:38<11:21, 75.75s/epoch, t_loss=0.8670 t_acc=23.0% v_loss=0.4059 v_acc=11.6%]Global:  91%|█████████ | 91/100 [1:54:38<11:21, 75.75s/epoch, t_loss=0.8670 t_acc=23.0% v_loss=0.4059 v_acc=11.6%]                                                                                                                    Epoch  92/100 | t_loss=1.0841 t_acc=20.7% | v_loss=0.3865 v_acc=19.3% *
+Global:  91%|█████████ | 91/100 [1:55:59<11:21, 75.75s/epoch, t_loss=1.0841 t_acc=20.7% v_loss=0.3865 v_acc=19.3% *]Global:  92%|█████████▏| 92/100 [1:55:59<10:17, 77.14s/epoch, t_loss=1.0841 t_acc=20.7% v_loss=0.3865 v_acc=19.3% *]Global:  92%|█████████▏| 92/100 [1:55:59<10:17, 77.14s/epoch, t_loss=1.0841 t_acc=20.7% v_loss=0.3865 v_acc=19.3% *]                                                                                                                      Epoch  93/100 | t_loss=0.7679 t_acc=28.9% | v_loss=0.4212 v_acc=20.5%
+Global:  92%|█████████▏| 92/100 [1:57:19<10:17, 77.14s/epoch, t_loss=0.7679 t_acc=28.9% v_loss=0.4212 v_acc=20.5%]Global:  93%|█████████▎| 93/100 [1:57:19<09:07, 78.15s/epoch, t_loss=0.7679 t_acc=28.9% v_loss=0.4212 v_acc=20.5%]Global:  93%|█████████▎| 93/100 [1:57:19<09:07, 78.15s/epoch, t_loss=0.7679 t_acc=28.9% v_loss=0.4212 v_acc=20.5%]                                                                                                                    Epoch  94/100 | t_loss=1.0003 t_acc=26.3% | v_loss=0.4188 v_acc=14.6%
+Global:  93%|█████████▎| 93/100 [1:58:34<09:07, 78.15s/epoch, t_loss=1.0003 t_acc=26.3% v_loss=0.4188 v_acc=14.6%]Global:  94%|█████████▍| 94/100 [1:58:34<07:42, 77.04s/epoch, t_loss=1.0003 t_acc=26.3% v_loss=0.4188 v_acc=14.6%]Global:  94%|█████████▍| 94/100 [1:58:34<07:42, 77.04s/epoch, t_loss=1.0003 t_acc=26.3% v_loss=0.4188 v_acc=14.6%]                                                                                                                    Epoch  95/100 | t_loss=1.0011 t_acc=20.3% | v_loss=0.4996 v_acc=4.0%
+Global:  94%|█████████▍| 94/100 [1:59:47<07:42, 77.04s/epoch, t_loss=1.0011 t_acc=20.3% v_loss=0.4996 v_acc=4.0%]Global:  95%|█████████▌| 95/100 [1:59:47<06:19, 75.83s/epoch, t_loss=1.0011 t_acc=20.3% v_loss=0.4996 v_acc=4.0%]Global:  95%|█████████▌| 95/100 [1:59:47<06:19, 75.83s/epoch, t_loss=1.0011 t_acc=20.3% v_loss=0.4996 v_acc=4.0%]                                                                                                                   Epoch  96/100 | t_loss=0.7643 t_acc=28.9% | v_loss=0.4272 v_acc=19.5%
+Global:  95%|█████████▌| 95/100 [2:01:03<06:19, 75.83s/epoch, t_loss=0.7643 t_acc=28.9% v_loss=0.4272 v_acc=19.5%]Global:  96%|█████████▌| 96/100 [2:01:03<05:04, 76.02s/epoch, t_loss=0.7643 t_acc=28.9% v_loss=0.4272 v_acc=19.5%]Global:  96%|█████████▌| 96/100 [2:01:03<05:04, 76.02s/epoch, t_loss=0.7643 t_acc=28.9% v_loss=0.4272 v_acc=19.5%]                                                                                                                    Epoch  97/100 | t_loss=0.9890 t_acc=19.5% | v_loss=0.5037 v_acc=2.7%
+Global:  96%|█████████▌| 96/100 [2:02:13<05:04, 76.02s/epoch, t_loss=0.9890 t_acc=19.5% v_loss=0.5037 v_acc=2.7%]Global:  97%|█████████▋| 97/100 [2:02:13<03:42, 74.22s/epoch, t_loss=0.9890 t_acc=19.5% v_loss=0.5037 v_acc=2.7%]Global:  97%|█████████▋| 97/100 [2:02:13<03:42, 74.22s/epoch, t_loss=0.9890 t_acc=19.5% v_loss=0.5037 v_acc=2.7%]                                                                                                                   Epoch  98/100 | t_loss=0.9021 t_acc=27.3% | v_loss=0.3797 v_acc=21.7% *
+Global:  97%|█████████▋| 97/100 [2:03:28<03:42, 74.22s/epoch, t_loss=0.9021 t_acc=27.3% v_loss=0.3797 v_acc=21.7% *]Global:  98%|█████████▊| 98/100 [2:03:28<02:28, 74.36s/epoch, t_loss=0.9021 t_acc=27.3% v_loss=0.3797 v_acc=21.7% *]Global:  98%|█████████▊| 98/100 [2:03:28<02:28, 74.36s/epoch, t_loss=0.9021 t_acc=27.3% v_loss=0.3797 v_acc=21.7% *]                                                                                                                      Epoch  99/100 | t_loss=0.7635 t_acc=30.4% | v_loss=0.4192 v_acc=22.6%
+Global:  98%|█████████▊| 98/100 [2:04:47<02:28, 74.36s/epoch, t_loss=0.7635 t_acc=30.4% v_loss=0.4192 v_acc=22.6%]Global:  99%|█████████▉| 99/100 [2:04:47<01:15, 75.82s/epoch, t_loss=0.7635 t_acc=30.4% v_loss=0.4192 v_acc=22.6%]Global:  99%|█████████▉| 99/100 [2:04:47<01:15, 75.82s/epoch, t_loss=0.7635 t_acc=30.4% v_loss=0.4192 v_acc=22.6%]                                                                                                                    Epoch 100/100 | t_loss=0.7727 t_acc=30.2% | v_loss=0.4249 v_acc=22.5%
+Global:  99%|█████████▉| 99/100 [2:06:01<01:15, 75.82s/epoch, t_loss=0.7727 t_acc=30.2% v_loss=0.4249 v_acc=22.5%]Global: 100%|██████████| 100/100 [2:06:01<00:00, 75.17s/epoch, t_loss=0.7727 t_acc=30.2% v_loss=0.4249 v_acc=22.5%]Global: 100%|██████████| 100/100 [2:06:01<00:00, 75.17s/epoch, t_loss=0.7727 t_acc=30.2% v_loss=0.4249 v_acc=22.5%]Global: 100%|██████████| 100/100 [2:06:01<00:00, 75.61s/epoch, t_loss=0.7727 t_acc=30.2% v_loss=0.4249 v_acc=22.5%]
+
+============================================================
+  FedPCNN 训练完成  |  总轮次: 100/100
+  最终 t_loss=0.7727 t_acc=30.2%  v_loss=0.4249 v_acc=22.5%
+  最优 v_loss=0.3901 (已恢复该轮权重)
+============================================================
+
+模型权重已保存（训练阶段）: ./results/models/FedPCNN_UNSW-NB15_non-iid_multi_model.pt
+
+分类器重训练
+  cRT Epoch 1/10: loss=1.7914
+  cRT Epoch 5/10: loss=1.7049
+  cRT Epoch 10/10: loss=1.6858
+  cRT 完成
+
+校准推理阈值（验证集网格搜索）...
+  当前Normal Recall=54.5%, 自适应floor=46.4%
+  少数类: [1, 2, 3, 5, 7, 8, 9] (样本数<平均值4123)
+  最优偏置: {1: '0.0', 2: '0.0', 3: '0.5', 5: '0.0', 7: '0.5', 8: '0.0', 9: '0.0'}
+  验证集macro-F1(校准后): 0.2756
+    类别  0: 53.9%
+    类别  1: 32.2%
+    类别  2: 0.0%
+    类别  3: 59.9%
+    类别  4: 6.1%
+    类别  5: 24.4%
+    类别  6: 79.9%
+    类别  7: 51.7%
+    类别  8: 50.4%
+    类别  9: 35.7%
+
+开始评估...
+
+评估模型性能...
+  使用logit偏置校准: ['0.0', '0.0', '0.0', '0.5', '0.0', '0.0', '0.0', '0.5', '0.0', '0.0']
+
+  逐类别 Recall:
+    类别 0: 53.9%
+    类别 1: 31.6%
+    类别 2: 0.0%
+    类别 3: 58.5%
+    类别 4: 6.6%
+    类别 5: 25.2%
+    类别 6: 80.0%
+    类别 7: 52.4%
+    类别 8: 57.6%
+    类别 9: 60.0%
+
+  Macro平均: Precision=31.02%, Recall=42.59%, F1=27.96%
+
+训练 Stacking 集成分类器 (RF + XGBoost → Meta-XGBoost)...
+  特征矩阵: (164910, 166)
+  5折 Out-of-Fold 生成元特征...
+    基学习器 [RF]... done
+    基学习器 [XGB]... done
+  全量训练基学习器...
+    [RF] 全量训练完成
+    [XGB] 全量训练完成
+  训练 Meta-XGBoost (输入维度: 20)...
+  Stacking 训练完成
+
+搜索最优 Normal 门限（带 FAR 约束）...
+  Baseline (无门限): Macro-F1=59.09%, FAR=10.80%
+  FAR 惩罚系数 λ=5.0 (FAR 每涨 1% 扣 5.0 分)
+  threshold=0.300 → Acc=78.80%, Macro-F1=59.59%, FAR=7.48%, score=59.59 *
+  threshold=0.325 → Acc=78.57%, Macro-F1=59.59%, FAR=7.96%, score=59.59
+  threshold=0.350 → Acc=78.22%, Macro-F1=59.49%, FAR=8.59%, score=59.49
+  threshold=0.375 → Acc=77.94%, Macro-F1=59.40%, FAR=9.07%, score=59.40
+  threshold=0.400 → Acc=77.74%, Macro-F1=59.34%, FAR=9.40%, score=59.34
+  threshold=0.425 → Acc=77.55%, Macro-F1=59.27%, FAR=9.74%, score=59.27
+  threshold=0.450 → Acc=77.40%, Macro-F1=59.23%, FAR=10.01%, score=59.23
+  threshold=0.475 → Acc=77.06%, Macro-F1=59.12%, FAR=10.56%, score=59.12
+  threshold=0.500 → Acc=76.67%, Macro-F1=58.99%, FAR=11.20%, score=56.99
+  threshold=0.525 → Acc=76.33%, Macro-F1=58.90%, FAR=11.78%, score=53.98
+  threshold=0.550 → Acc=75.99%, Macro-F1=58.78%, FAR=12.33%, score=51.11
+  threshold=0.575 → Acc=75.64%, Macro-F1=58.65%, FAR=12.85%, score=48.37
+  threshold=0.600 → Acc=75.46%, Macro-F1=58.57%, FAR=13.13%, score=46.92
+  threshold=0.625 → Acc=75.28%, Macro-F1=58.50%, FAR=13.39%, score=45.55
+  threshold=0.650 → Acc=75.20%, Macro-F1=58.47%, FAR=13.51%, score=44.94
+  threshold=0.675 → Acc=75.08%, Macro-F1=58.42%, FAR=13.68%, score=44.01
+  threshold=0.700 → Acc=74.98%, Macro-F1=58.38%, FAR=13.84%, score=43.15
+  threshold=0.725 → Acc=74.86%, Macro-F1=58.33%, FAR=14.01%, score=42.27
+
+  最优门限: 0.300 (Macro-F1=59.59%, FAR=7.48%, score=59.59)
+
+评估 CNN + Stacking 性能...
+
+  逐类别 Recall (CNN+XGBoost):
+    类别 0: 79.4%
+    类别 1: 65.8%
+    类别 2: 58.6%
+    类别 3: 49.4%
+    类别 4: 50.5%
+    类别 5: 80.2%
+    类别 6: 98.3%
+    类别 7: 82.7%
+    类别 8: 94.4%
+    类别 9: 80.0%
+
+  Macro平均: Precision=56.77%, Recall=73.93%, F1=59.24%
+  XGBoost (无门限): Acc=76.82%, Macro-F1=59.24%, FAR=10.73%
+
+评估 CNN + Stacking 性能...
+
+  逐类别 Recall (CNN+XGBoost, Normal门限=0.3):
+    类别 0: 88.0%
+    类别 1: 62.6%
+    类别 2: 58.6%
+    类别 3: 49.4%
+    类别 4: 50.3%
+    类别 5: 69.1%
+    类别 6: 98.3%
+    类别 7: 82.7%
+    类别 8: 94.4%
+    类别 9: 80.0%
+
+  Macro平均: Precision=57.59%, Recall=73.35%, F1=59.84%
+  XGBoost (门限=0.30): Acc=78.84%, Macro-F1=59.84%, FAR=7.29%
+
+  最终选择: CNN+XGBoost(门限=0.30) (Macro-F1: CNN=27.96% vs XGBoost=59.84%)
+
+结果已保存: ./results/UNSW-NB15_fedpcnn_non-iid_multi_alpha0.5.json
+
+实验结果已保存（评估阶段）
+模型权重已更新（含评估结果）: ./results/models/FedPCNN_UNSW-NB15_non-iid_multi_model.pt
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+[图表] 损失曲线已保存: ./results/plots/FedPCNN_UNSW-NB15_non-iid_multi_loss.png
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+[图表] 混淆矩阵已保存: ./results/plots/FedPCNN_UNSW-NB15_non-iid_multi_cm.png
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+[图表] 模型对比已保存: ./results/plots/FedPCNN_UNSW-NB15_non-iid_multi_metrics.png
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+[图表] 逐类别指标已保存: ./results/plots/FedPCNN_UNSW-NB15_non-iid_multi_per_class.png
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+findfont: Font family 'SimHei' not found.
+[图表] 模型对比(水平)已保存: ./results/plots/FedPCNN_UNSW-NB15_non-iid_multi_comparison.png
+
+============================================================
+实验总结
+============================================================
+数据集: UNSW-NB15
+训练样本: 164910, 验证样本: 41228, 测试样本: 51535
+类别数: 10, 特征数: 38
+数据划分: NON-IID (alpha=0.5)
+评估指标:
+  Accuracy: 78.84%
+  Precision: 86.14%
+  Recall: 78.84%
+  F1-Score: 81.07%
+  Macro-Precision: 57.59%
+  Macro-Recall: 73.35%
+  Macro-F1: 59.84%
+  FAR: 7.29%
+============================================================
+
+实验完成!
+  已清理 checkpoint: /root/FL-optimize/checkpoints/UNSW-NB15_non-iid_multi_v8_fl.pt
