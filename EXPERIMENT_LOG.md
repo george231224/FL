@@ -207,6 +207,7 @@
 | cloud-base60-bohb5cv-fine | 80.53% | 61.76% | 6.75% | RTX4090, 复用base60主干 + BOHB(5-fold CV) + 门限0.295 |
 | cloud-base60-bohb-thr0280 | 80.69% | 62.37% | 6.31% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.280 |
 | cloud-base60-bohb-thr0285 | 80.66% | 62.37% | 6.37% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.285 |
+| cloud-base60-bohb-thr0275 | 80.70% | 62.36% | 6.26% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.275 |
 
 ---
 
@@ -521,3 +522,35 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=62.37%`, `FAR=6.37%`
 
 结论：`base60_bohb_thr0285` 与 `base60_bohb_thr0280` 的 `Macro-F1` 同为 `62.37%`，但 `Accuracy` 更低 `-0.03`、`FAR` 更高 `+0.06`。这说明在当前主线上，`0.280` 明显优于 `0.285`，后续无需继续往更高门限细调；如果还要追更优解，应改做 `0.275` 或重新设计门限选择准则，而不是继续向 `0.29+` 方向搜索。
+
+### UNSW-NB15 多分类 Non-IID base60_bohb_thr0275（远端 60轮主干 + 显式门限0.275）
+- 目的：在 `base60_bohb_thr0280` 与 `base60_bohb_thr0285` 已明确排序后，继续向更低门限微调，验证 `0.275` 能否进一步降低 `FAR`，并观察 `Macro-F1` 是否开始明显下滑
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：复用 `base60` 主干, `global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=30`, `bohb_cv_folds=3`, `exp_tag=base60_bohb_thr0275`
+- 复用模型：`./results/models/FedPCNN_UNSW-NB15_non-iid_multi_base60_model.pt`
+- 门限搜索：`threshold_start=0.275`, `threshold_end=0.275`, `threshold_step=0.005`, `threshold_lambda=5.0`（等价于显式固定 `normal_threshold=0.275`）
+- 最终分类器：`CNN+XGBoost(门限=0.28)`，实际最优 `normal_threshold=0.275`（终端/结果文件按两位小数展示为 `0.28`）
+- 归档目录：`results/archive/2026-03-22_152826_base60_bohb_thr0275_2026-03-22_152858/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.70% |
+| Precision | 85.19% |
+| Recall | 80.70% |
+| F1-Score | 81.88% |
+| Macro-Precision | 59.96% |
+| Macro-Recall | 69.51% |
+| Macro-F1 | 62.36% |
+| FAR | 6.26% |
+
+BOHB 最优参数：
+- 与 `base60_bohb_thr0280 / base60_bohb_thr0285 / base60_bohb_fine` 一致：`n_estimators=145`, `max_depth=8`, `learning_rate=0.1447`, `subsample=0.8055`, `colsample_bytree=0.7040`, `min_child_weight=6`, `gamma=0.6257`, `reg_alpha=0.5819`, `reg_lambda=0.0249`
+- `best_cv_macro_f1=60.91`
+
+门限搜索摘要：
+- 无门限 baseline：`Macro-F1=62.23%`, `FAR=9.70%`
+- 显式门限：`threshold=0.275`, `Macro-F1=62.62%`, `FAR=6.44%`（验证集）
+- 测试集最终：`Macro-F1=62.36%`, `FAR=6.26%`
+
+结论：相较 `base60_bohb_thr0280`（80.69 / 62.37 / 6.31），`base60_bohb_thr0275` 的 `Accuracy` 再提升了 `+0.01`，`FAR` 再下降了 `-0.05`，但 `Macro-F1` 也再下降了 `-0.01`。这说明当前门限扫描已经进入稳定 trade-off 区间：门限越低，`FAR` 越好、`Accuracy` 略升，而 `Macro-F1` 开始缓慢回落。若以综合平衡为主，`0.280` 仍是更好的交付点；若优先追求更低 `FAR`，`0.275` 是当前最优。
