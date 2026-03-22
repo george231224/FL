@@ -204,6 +204,7 @@
 | cloud-bohb50-fine | 80.37% | 61.67% | 6.52% | RTX4090, 复用bohb50主干 + 门限细搜0.275 |
 | cloud-base60-bohb-fine | 80.59% | 62.39% | 6.57% | RTX4090, 复用base60主干 + BOHB + 门限0.30 |
 | cloud-base60-bohb60-fine | 80.58% | 61.92% | 6.33% | RTX4090, 复用base60主干 + 60次BOHB + 门限0.285 |
+| cloud-base60-bohb5cv-fine | 80.53% | 61.76% | 6.75% | RTX4090, 复用base60主干 + BOHB(5-fold CV) + 门限0.295 |
 
 ---
 
@@ -392,3 +393,57 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=61.92%`, `FAR=6.33%`
 
 结论：相较 `cloud-base60-bohb-fine`（80.59 / 62.39 / 6.57），`base60_bohb60_fine` 的 `FAR` 继续下降了 `-0.24`，但 `Macro-F1` 反而下降了 `-0.47`，`Accuracy` 基本持平。这说明继续增加同一条线上的 `BOHB` 搜索预算，已经开始更偏向验证集拟合，而不是带来稳定的测试集提升。当前综合最优仍然是 `cloud-base60-bohb-fine`。
+
+### UNSW-NB15 多分类 Non-IID dynagg60_bohb_fine（远端动态聚合复核，中止）
+- 目的：验证“动态聚合”在当前代码里是否真的被启用，并确认它在 `Non-IID + SMOTE + 60轮主干 + BOHB` 设定下是否还有可用性
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：`global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `dynamic_agg=ON`, `bohb=30`, `exp_tag=dynagg60_bohb_fine`
+- 复用模型：无，直接走 FL 主干训练
+- 门限搜索：计划为 `threshold_start=0.26`, `threshold_end=0.34`, `threshold_step=0.005`, `threshold_lambda=5.0`，但训练阶段已提前中止，未进入正式 BOHB / 测试评估
+- 代码修复：此前 CLI 只有 `--no-dynamic-agg` 且默认值为 `True`，实际导致动态聚合无法从命令行启用；本次已改为显式 `--dynamic-agg / --no-dynamic-agg` 双开关，默认关闭
+- 过程证据：远端日志已明确打印 `动态聚合=ON` 和 `聚合方式: 动态聚合 (n_k / loss_k)`，说明开关已真正生效
+- 训练现象：从 `Epoch 21/60` 继续后，验证集准确率在 `2.4% → 2.5% → 6.0% → 6.1% → 21.3% → 4.8% → 1.2% → 1.5% → 6.3%` 间剧烈波动，训练损失和验证损失均明显不稳定
+- 归档状态：未归档，仅保留远端日志 `dynagg60_bohb_fine.log / dynagg60_bohb_fine_resume.log` 作为失败证据
+
+结论：动态聚合现在已经可以被真实启用，但在当前 `UNSW-NB15 多分类 Non-IID + Borderline-SMOTE` 设定下表现出明显失稳，不具备继续作为主线优化方向的价值。后续不再沿这条线追加实验预算。
+
+### UNSW-NB15 多分类 Non-IID base60_bohb5cv_fine（远端 60轮主干 + 5折BOHB）
+- 目的：验证在 `base60_bohb_fine` 已接近历史最佳后，把 Meta-XGBoost 的 `BOHB CV` 从默认 `3-fold` 提高到 `5-fold`，是否能减少验证集过拟合并提升测试集泛化
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：复用 `base60` 主干, `global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=30`, `bohb_cv_folds=5`, `exp_tag=base60_bohb5cv_fine`
+- 复用模型：`./results/models/FedPCNN_UNSW-NB15_non-iid_multi_base60_model.pt`
+- 门限搜索：`threshold_start=0.26`, `threshold_end=0.34`, `threshold_step=0.005`, `threshold_lambda=5.0`
+- 最终分类器：`CNN+XGBoost(门限=0.30)`，实际最优 `normal_threshold=0.295`
+- 归档目录：`results/archive/2026-03-22_131739_base60_bohb5cv_fine_2026-03-22_131957/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.53% |
+| Precision | 84.73% |
+| Recall | 80.53% |
+| F1-Score | 81.71% |
+| Macro-Precision | 59.06% |
+| Macro-Recall | 68.79% |
+| Macro-F1 | 61.76% |
+| FAR | 6.75% |
+
+BOHB 最优参数：
+- `n_estimators=121`
+- `max_depth=8`
+- `learning_rate=0.1888`
+- `subsample=0.6026`
+- `colsample_bytree=0.5095`
+- `min_child_weight=5`
+- `gamma=0.5536`
+- `reg_alpha=1.8320`
+- `reg_lambda=0.0326`
+- `best_cv_macro_f1=61.41`
+
+门限搜索摘要：
+- 无门限 baseline：`Macro-F1=62.07%`, `FAR=9.73%`
+- 验证集最优：`threshold=0.295`, `Macro-F1=62.50%`, `FAR=6.78%`
+- 验证集次优：`threshold=0.260`, `Macro-F1=62.49%`, `FAR=6.32%`
+- 测试集最终：`Macro-F1=61.76%`, `FAR=6.75%`
+
+结论：相较 `cloud-base60-bohb-fine`（80.59 / 62.39 / 6.57），`base60_bohb5cv_fine` 的 `Accuracy` 下降了 `-0.06`，`Macro-F1` 下降了 `-0.63`，`FAR` 也回升了 `+0.18`。这说明把 Meta-XGBoost 的交叉验证从 `3-fold` 提到 `5-fold`，并没有减少测试集过拟合，反而削弱了当前最优主线。结合 `base60_bohb60_fine` 的负结果，可以确认后续不应继续沿“增加 BOHB 搜索保守性/预算”这条线投入时间。

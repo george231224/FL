@@ -134,7 +134,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
                 dynamic_agg=False, bohb_trials=0, exp_tag=None,
                 pretrained_model_path=None,
                 threshold_start=0.30, threshold_end=0.75, threshold_step=0.025,
-                threshold_lambda=5.0):
+                threshold_lambda=5.0,
+                bohb_cv_folds=3):
     print("=" * 60)
     print("FedPCNN ")
     print("=" * 60)
@@ -314,7 +315,12 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
 
     # ── CNN + XGBoost 分类器 ─────────────────────────────────────────────
     if bohb_trials > 0:
-        fedpcnn.train_svm_bohb(X_train, y_train, n_trials=bohb_trials, checkpoint_tag=ckpt_tag)
+        fedpcnn.train_svm_bohb(
+            X_train, y_train,
+            n_trials=bohb_trials,
+            checkpoint_tag=ckpt_tag,
+            cv_folds=bohb_cv_folds,
+        )
     else:
         fedpcnn.train_svm(X_train, y_train)
 
@@ -369,6 +375,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         'threshold_end': threshold_end,
         'threshold_step': threshold_step,
         'threshold_lambda': threshold_lambda,
+        'bohb_cv_folds': bohb_cv_folds,
     }
     if exp_tag:
         save_params['exp_tag'] = exp_tag
@@ -1047,8 +1054,11 @@ if __name__ == '__main__':
     parser.add_argument('--classification', type=str, choices=['binary', 'multi'],
                         default='multi',
                         help='分类模式: binary (二分类) 或 multi (多分类，默认)')
-    parser.add_argument('--no-dynamic-agg', action='store_true', default=True,
-                        help='禁用动态聚合（默认禁用）')
+    parser.add_argument('--dynamic-agg', dest='dynamic_agg', action='store_true',
+                        help='启用动态聚合（权重 ∝ 样本数 × 1/loss）')
+    parser.add_argument('--no-dynamic-agg', dest='dynamic_agg', action='store_false',
+                        help='禁用动态聚合（默认）')
+    parser.set_defaults(dynamic_agg=False)
     parser.add_argument('--bohb', type=int, default=0, metavar='N',
                         help='XGBoost BOHB超参搜索试验次数 (0=禁用, 推荐30)')
     parser.add_argument('--exp-tag', type=str, default='',
@@ -1063,6 +1073,8 @@ if __name__ == '__main__':
                         help='Normal 门限搜索步长')
     parser.add_argument('--threshold-lambda', type=float, default=5.0,
                         help='Normal 门限搜索中的 FAR 惩罚系数')
+    parser.add_argument('--bohb-cv-folds', type=int, default=3,
+                        help='BOHB 搜索 Meta-XGBoost 时的交叉验证折数')
 
     args = parser.parse_args()
 
@@ -1083,18 +1095,19 @@ if __name__ == '__main__':
         if args.model == 'fedpcnn':
             run_fedpcnn(args.dataset, args.partition, args.alpha, device,
                         args.global_rounds, args.local_epochs, args.classification,
-                        dynamic_agg=not args.no_dynamic_agg,
+                        dynamic_agg=args.dynamic_agg,
                         bohb_trials=args.bohb,
                         exp_tag=args.exp_tag or None,
                         pretrained_model_path=args.pretrained_model_path or None,
                         threshold_start=args.threshold_start,
                         threshold_end=args.threshold_end,
                         threshold_step=args.threshold_step,
-                        threshold_lambda=args.threshold_lambda)
+                        threshold_lambda=args.threshold_lambda,
+                        bohb_cv_folds=args.bohb_cv_folds)
         elif args.model == 'fedpcnn-2stage':
             run_fedpcnn_two_stage(args.dataset, args.partition, args.alpha, device,
                                   args.global_rounds, args.local_epochs, args.classification,
-                                  dynamic_agg=not args.no_dynamic_agg,
+                                  dynamic_agg=args.dynamic_agg,
                                   exp_tag=args.exp_tag or None)
         elif args.model == 'segmented':
             run_segmented_fl(args.dataset, args.partition, args.alpha, device,

@@ -1231,19 +1231,20 @@ class FedPCNN:
         print(f"  Stacking 训练完成")
         return self.svm_classifier
 
-    def train_svm_bohb(self, X_train, y_train, n_trials=30, checkpoint_tag=None):
+    def train_svm_bohb(self, X_train, y_train, n_trials=30, checkpoint_tag=None, cv_folds=3):
         """Stacking + BOHB: 先训练基学习器生成元特征，再搜索 Meta-XGBoost 最优超参
 
         流程:
           1. 提取 CNN 特征
           2. 5折 OOF 训练 RF + XGBoost 基学习器 → 元特征
-          3. Optuna 搜索 Meta-XGBoost 超参数 (3折CV on 元特征)
+          3. Optuna 搜索 Meta-XGBoost 超参数 (cv_folds 折CV on 元特征)
           4. 用最优参数全量训练 Meta-XGBoost
 
         参数:
             X_train, y_train: 训练数据（原始特征）
             n_trials: 搜索试验次数，默认 30
             checkpoint_tag: 断点续训标识
+            cv_folds: Meta-XGBoost 交叉验证折数，默认 3
         """
         import optuna
         from sklearn.preprocessing import StandardScaler
@@ -1322,7 +1323,7 @@ class FedPCNN:
             print(f"    [{name}] 全量训练完成")
 
         # ── 3. BOHB 搜索 Meta-XGBoost 超参 ──
-        print(f"\n  BOHB 搜索 Meta-XGBoost ({n_trials} trials)...")
+        print(f"\n  BOHB 搜索 Meta-XGBoost ({n_trials} trials, {cv_folds}-fold CV)...")
         num_classes = self.num_classes
         meta_dim = meta_features.shape[1]
 
@@ -1346,7 +1347,7 @@ class FedPCNN:
                 'verbosity': 0,
             }
 
-            skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+            skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
             fold_scores = []
             for train_idx, val_idx in skf.split(meta_features, labels):
                 X_tr, X_va = meta_features[train_idx], meta_features[val_idx]
@@ -1393,7 +1394,7 @@ class FedPCNN:
         elapsed = time.time() - t0
 
         print(f"\n  搜索完成! 耗时 {elapsed/60:.1f} 分钟")
-        print(f"  最佳 3折CV Macro-F1: {study.best_value*100:.2f}%")
+        print(f"  最佳 {cv_folds}折CV Macro-F1: {study.best_value*100:.2f}%")
         print(f"  最佳参数:")
         for k, v in study.best_params.items():
             fmt = f"{v:.4f}" if isinstance(v, float) else str(v)
