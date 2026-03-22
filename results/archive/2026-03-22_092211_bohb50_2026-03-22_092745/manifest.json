@@ -1,0 +1,14 @@
+{
+  "source_result": "results/UNSW-NB15_fedpcnn_non-iid_multi_alpha0.5_bohb50.json",
+  "plots": [
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_cm.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_comparison.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_loss.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_metrics.png",
+    "results/plots/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_per_class.png"
+  ],
+  "models": [
+    "results/models/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_model.pt"
+  ],
+  "archived_at": "2026-03-22 09:27:45"
+}

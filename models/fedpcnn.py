@@ -679,6 +679,10 @@ class FedPCNN:
                           leave=True, dynamic_ncols=True)
 
         round_idx = max(start_round - 1, 0)  # default if loop is skipped
+        train_loss_eval = train_loss_history[-1] if train_loss_history else float('nan')
+        train_acc = float('nan')
+        val_loss_cur = val_loss_history[-1] if val_loss_history else float('nan')
+        val_acc_cur = float('nan')
         for round_idx in range(start_round, global_rounds):
             # 全局 lr 余弦衰减
             lr_round = lr_init * 0.5 * (1 + math.cos(math.pi * round_idx / global_rounds))
@@ -824,7 +828,7 @@ class FedPCNN:
         print(f"\n{'='*60}")
         print(f"  FedPCNN 训练完成  |  总轮次: {final_epoch}/{global_rounds}")
         print(f"  最终 t_loss={train_loss_eval:.4f} t_acc={train_acc:.1f}%  "
-              f"v_loss={val_loss_history[-1]:.4f} v_acc={val_acc_cur:.1f}%")
+              f"v_loss={val_loss_cur:.4f} v_acc={val_acc_cur:.1f}%")
         if best_weights is not None:
             print(f"  最优 v_loss={best_val_loss:.4f} (已恢复该轮权重)")
         print(f"{'='*60}")
@@ -1333,6 +1337,7 @@ class FedPCNN:
                 'gamma': trial.suggest_float('gamma', 0.0, 5.0),
                 'reg_alpha': trial.suggest_float('reg_alpha', 1e-3, 10.0, log=True),
                 'reg_lambda': trial.suggest_float('reg_lambda', 1e-3, 10.0, log=True),
+                'early_stopping_rounds': 20,
                 'objective': 'multi:softprob',
                 'num_class': num_classes,
                 'tree_method': 'hist', 'device': 'cuda' if torch.cuda.is_available() else 'cpu',
@@ -1350,7 +1355,7 @@ class FedPCNN:
                 model = XGBClassifier(**param)
                 model.fit(X_tr, y_tr, sample_weight=weights,
                           eval_set=[(X_va, y_va)],
-                          early_stopping_rounds=20, verbose=False)
+                          verbose=False)
                 preds = model.predict(X_va)
                 fold_scores.append(f1_score(y_va, preds, average='macro', zero_division=0))
             return np.mean(fold_scores)

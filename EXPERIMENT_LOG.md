@@ -200,6 +200,7 @@
 | v7 (权重未修) | 78.39% | 58.56% | 7.80% | 2层CNN+CenterLoss |
 | v8 (本次) | 78.84% | 59.84% | 7.29% | 1层CNN+38维+逆频率 |
 | cloud-base60 | 79.01% | 60.64% | 7.41% | RTX4090, 60轮, 门限0.30 |
+| cloud-bohb50 | 80.20% | 61.65% | 6.89% | RTX4090, 50轮 + BOHB, 门限0.30 |
 
 ---
 
@@ -245,3 +246,37 @@
 | FAR | 7.41% |
 
 结论：相较日志中的 `v8`（78.84 / 59.84 / 7.29），`base60` 把 `Macro-F1` 提升了 `+0.80`，`Accuracy` 提升了 `+0.17`，但 `FAR` 略高 `+0.12`。当前已证明远端环境可稳定复现 `60+ Macro-F1`，下一步看 `bohb50` 是否能进一步逼近历史最佳 `62.63 / 6.41`。
+
+### UNSW-NB15 多分类 Non-IID bohb50（远端 BOHB 恢复实验）
+- 目的：验证“历史最佳包含 BOHB”这一关键差异是否能在 RTX 4090 云端环境复现
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：50轮, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=30`, `exp_tag=bohb50`
+- 最终分类器：`CNN+XGBoost(门限=0.30)`
+- 归档目录：`results/archive/2026-03-22_092211_bohb50_2026-03-22_092745/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+- 过程备注：中途暴露两处续跑/兼容性问题，已修复后从 checkpoint 恢复，不需要重做前 50 轮 FL 训练
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.20% |
+| Precision | 85.53% |
+| Recall | 80.20% |
+| F1-Score | 81.65% |
+| Macro-Precision | 59.09% |
+| Macro-Recall | 70.17% |
+| Macro-F1 | 61.65% |
+| FAR | 6.89% |
+
+BOHB 最优参数：
+- `n_estimators=113`
+- `max_depth=8`
+- `learning_rate=0.1374`
+- `subsample=0.7245`
+- `colsample_bytree=0.5277`
+- `min_child_weight=4`
+- `gamma=0.6327`
+- `reg_alpha=1.8445`
+- `reg_lambda=0.0194`
+- `best_cv_macro_f1=60.95`
+
+结论：相较 `cloud-base60`（79.01 / 60.64 / 7.41），`bohb50` 再提升了 `+1.19 Accuracy`、`+1.01 Macro-F1`，同时把 `FAR` 压低了 `-0.52`。相较仓库记录的历史最佳 `80.68 / 62.63 / 6.41`，当前仍有约 `0.98 Macro-F1` 和 `0.48 FAR` 的差距，但已经明显逼近。
