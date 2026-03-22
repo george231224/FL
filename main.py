@@ -36,10 +36,10 @@ def _with_exp_suffix(base, exp_tag=None):
 
 
 def _format_threshold(threshold):
-    """统一门限显示精度，避免 0.275 / 0.285 都显示成 0.28。"""
+    """统一门限显示精度，避免细粒度门限被显示成同一个值。"""
     if threshold is None:
         return "None"
-    return f"{float(threshold):.3f}".rstrip('0').rstrip('.')
+    return f"{float(threshold):.5f}".rstrip('0').rstrip('.')
 
 
 def set_seed(seed=42):
@@ -394,7 +394,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         'batch_size': 256,
         'lr': hp_lr,
         'classifier': best_path,
-        'normal_threshold': round(float(normal_threshold), 4) if normal_threshold is not None else None,
+        'normal_threshold': round(float(normal_threshold), 5) if normal_threshold is not None else None,
         'threshold_start': threshold_start,
         'threshold_end': threshold_end,
         'threshold_step': threshold_step,

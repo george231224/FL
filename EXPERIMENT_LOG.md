@@ -213,6 +213,7 @@
 | cloud-base60-bohb-farcap630 | 80.73% | 62.34% | 6.16% | RTX4090, selector_v2(far_cap=6.30) 自动选门限0.265 |
 | cloud-base60-bohb-thr0270 | 80.73% | 62.36% | 6.19% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.270 |
 | cloud-base60-bohb-thr02725 | 80.73% | 62.37% | 6.22% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.2725 |
+| cloud-base60-bohb-thr027125 | 80.73% | 62.36% | 6.20% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.27125 |
 | cloud-feature20-mrmr | 78.75% | 60.33% | 7.64% | RTX4090, 20轮 smoke 控制组, feature_order=mrmr |
 | cloud-feature20-corr-greedy | 79.02% | 59.95% | 7.37% | RTX4090, 20轮 smoke, feature_order=corr_greedy |
 | cloud-feature20-semantic-group | 78.90% | 59.66% | 7.44% | RTX4090, 20轮 smoke, feature_order=semantic_group |
@@ -724,6 +725,38 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=62.37%`, `FAR=6.22%`
 
 结论：`base60_bohb_thr02725` 把 `0.270` 的 `Macro-F1` 再抬高了约 `+0.01`，而 `FAR` 只回升约 `+0.03`；相较 `0.280`，它几乎保住了同级别的 `Macro-F1`，但把 `FAR` 明显压低了 `-0.09`，`Accuracy` 也更高。到这一步，当前最优折中点已经从 `0.280` 明显转移到 `0.2725`：如果目标是“尽量不牺牲 `Macro-F1` 的前提下把 `FAR` 压低”，`0.2725` 是目前最值得交付和继续围绕的门限。
+
+### UNSW-NB15 多分类 Non-IID base60_bohb_thr027125（远端 60轮主干 + 显式门限0.27125）
+- 目的：在 `0.2725` 被验证为当前最优折中点后，再向下细调半步，确认 `0.27125` 是否还能继续降低 `FAR` 且不丢失 `Macro-F1`
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：复用 `base60` 主干, `global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=30`, `bohb_cv_folds=3`, `exp_tag=base60_bohb_thr027125`
+- 复用模型：`./results/models/FedPCNN_UNSW-NB15_non-iid_multi_base60_model.pt`
+- 门限设置：单点验证 `threshold_start=0.27125`, `threshold_end=0.27125`, `threshold_step=0.00125`, `threshold_selector=far_cap`, `threshold_far_cap=100.0`
+- 最终分类器：`CNN+XGBoost(门限=0.27125)`，显式固定 `normal_threshold=0.27125`
+- 归档目录：`results/archive/2026-03-22_215643_base60_bohb_thr027125_2026-03-22_215713/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.73% |
+| Precision | 85.19% |
+| Recall | 80.73% |
+| F1-Score | 81.90% |
+| Macro-Precision | 59.98% |
+| Macro-Recall | 69.49% |
+| Macro-F1 | 62.36% |
+| FAR | 6.20% |
+
+BOHB 最优参数：
+- 与 `base60_bohb_thr02725 / base60_bohb_thr0270 / base60_bohb_farcap630 / base60_bohb_farcap645 / base60_bohb_farcap650 / base60_bohb_thr0275 / base60_bohb_thr0280 / base60_bohb_fine` 一致：`n_estimators=145`, `max_depth=8`, `learning_rate=0.1447`, `subsample=0.8055`, `colsample_bytree=0.7040`, `min_child_weight=6`, `gamma=0.6257`, `reg_alpha=0.5819`, `reg_lambda=0.0249`
+- `best_cv_macro_f1=60.91`
+
+门限搜索摘要：
+- 无门限 baseline：`Macro-F1=62.23%`, `FAR=9.70%`
+- 单点门限验证：`threshold=0.27125`, 验证集 `Macro-F1=62.61%`, `FAR=6.39%`
+- 测试集最终：`Macro-F1=62.36%`, `FAR=6.20%`
+
+结论：`base60_bohb_thr027125` 相较 `0.2725` 只把 `FAR` 再降低了约 `-0.02`，但 `Macro-F1` 没有继续提升；相较 `0.270`，它也没有形成新的明显优势。到这里可以认为 `0.2725` 左侧已经基本收敛，继续往下细扫的边际收益很低。
 
 ### UNSW-NB15 多分类 Non-IID feature20_mrmr（远端 20轮 smoke 控制组）
 - 目的：为后续 `corr_greedy / semantic_group` 两个特征排序方案建立同轮次、同配置的对照基线，避免拿 `20轮` 结果直接和 `60轮` 正式主线混比
