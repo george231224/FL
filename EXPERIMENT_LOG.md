@@ -212,6 +212,7 @@
 | cloud-base60-bohb-farcap645 | 80.70% | 62.36% | 6.26% | RTX4090, selector_v2(far_cap=6.45) 自动选门限0.275 |
 | cloud-feature20-mrmr | 78.75% | 60.33% | 7.64% | RTX4090, 20轮 smoke 控制组, feature_order=mrmr |
 | cloud-feature20-corr-greedy | 79.02% | 59.95% | 7.37% | RTX4090, 20轮 smoke, feature_order=corr_greedy |
+| cloud-feature20-semantic-group | 78.90% | 59.66% | 7.44% | RTX4090, 20轮 smoke, feature_order=semantic_group |
 
 ---
 
@@ -681,3 +682,33 @@ BOHB 最优参数：
 - `FAR -0.27`
 
 结论：`corr_greedy` 在 `20轮 smoke` 上确实改善了 `Accuracy/FAR`，但明显拉低了 `Macro-F1`。这说明“把相关特征排在一起”未必对当前 `FedPCNN` 更有利，它更像是在增强 `Normal/Attack` 边界而不是提升多分类整体均衡性。按现有结果，这条排序方向暂时不满足继续做 `60轮` 验证的条件。
+
+### UNSW-NB15 多分类 Non-IID feature20_semantic_group（远端 20轮 smoke，语义分组重排）
+- 目的：验证把连续特征按粗粒度语义分组后，是否能比 `mrmr` 原顺序更快形成局部模式，从而提升 `1D CNN` 的短程训练效果
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：`global_rounds=20`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `feature_order=semantic_group`, `exp_tag=feature20_semantic_group`
+- 最终分类器：`CNN+XGBoost(门限=0.300)`，`threshold_selector=baseline_penalty`
+- 归档目录：`results/archive/2026-03-22_193003_feature20_semantic_group_2026-03-22_193103/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 78.90% |
+| Precision | 86.19% |
+| Recall | 78.90% |
+| F1-Score | 81.13% |
+| Macro-Precision | 57.33% |
+| Macro-Recall | 73.22% |
+| Macro-F1 | 59.66% |
+| FAR | 7.44% |
+
+对照 `feature20_mrmr`（78.75 / 60.33 / 7.64）：
+- `Accuracy +0.15`
+- `Macro-F1 -0.67`
+- `FAR -0.20`
+
+训练过程观察：
+- 主干训练阶段的中后段验证信号一度优于前两组，`v_acc` 在第 `17` 轮短暂到达 `11.5%`
+- 但最终进入 `CNN+XGBoost` 后，测试集 `Macro-F1` 仍然没能超过 `mrmr` 控制组
+
+结论：`semantic_group` 在短程训练中带来了一些更积极的中间信号，但最终测试集表现仍然是“`Accuracy/FAR` 略好、`Macro-F1` 更差”的同一模式。到这里三组 `feature-order smoke` 的结论已经比较明确：当前最值得保留的仍然是原始 `mrmr` 顺序，特征排序暂时不是比自动门限更强的主线优化方向。
