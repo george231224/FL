@@ -203,6 +203,7 @@
 | cloud-bohb50 | 80.20% | 61.65% | 6.89% | RTX4090, 50轮 + BOHB, 门限0.30 |
 | cloud-bohb50-fine | 80.37% | 61.67% | 6.52% | RTX4090, 复用bohb50主干 + 门限细搜0.275 |
 | cloud-base60-bohb-fine | 80.59% | 62.39% | 6.57% | RTX4090, 复用base60主干 + BOHB + 门限0.30 |
+| cloud-base60-bohb60-fine | 80.58% | 61.92% | 6.33% | RTX4090, 复用base60主干 + 60次BOHB + 门限0.285 |
 
 ---
 
@@ -351,3 +352,43 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=62.39%`, `FAR=6.57%`
 
 结论：相较 `cloud-bohb50-fine`（80.37 / 61.67 / 6.52），`base60_bohb_fine` 把 `Accuracy` 提升了 `+0.22`，`Macro-F1` 提升了 `+0.72`，但 `FAR` 小幅回升了 `+0.05`。相较历史最佳 `80.68 / 62.63 / 6.41`，当前只差约 `0.09 Accuracy`、`0.24 Macro-F1` 和 `0.16 FAR`，已经非常接近仓库记录的最优结果。
+
+### UNSW-NB15 多分类 Non-IID base60_bohb60_fine（远端 60轮主干 + 60次BOHB）
+- 目的：验证在 `base60_bohb_fine` 已接近历史最佳后，继续把 `BOHB` 搜索预算从 `30` 提到 `60 trials` 是否还能带来测试集收益
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：复用 `base60` 主干, `global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=60`, `exp_tag=base60_bohb60_fine`
+- 复用模型：`./results/models/FedPCNN_UNSW-NB15_non-iid_multi_base60_model.pt`
+- 门限搜索：`threshold_start=0.26`, `threshold_end=0.34`, `threshold_step=0.005`, `threshold_lambda=5.0`
+- 最终分类器：`CNN+XGBoost(门限=0.29)`，实际最优 `normal_threshold=0.285`
+- 归档目录：`results/archive/2026-03-22_114750_base60_bohb60_fine_2026-03-22_114811/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.58% |
+| Precision | 85.13% |
+| Recall | 80.58% |
+| F1-Score | 81.81% |
+| Macro-Precision | 60.12% |
+| Macro-Recall | 68.20% |
+| Macro-F1 | 61.92% |
+| FAR | 6.33% |
+
+BOHB 最优参数：
+- `n_estimators=189`
+- `max_depth=8`
+- `learning_rate=0.0961`
+- `subsample=0.6708`
+- `colsample_bytree=0.5058`
+- `min_child_weight=1`
+- `gamma=0.0210`
+- `reg_alpha=0.0630`
+- `reg_lambda=0.0013`
+- `best_cv_macro_f1=61.38`
+
+门限搜索摘要：
+- 无门限 baseline：`Macro-F1=62.87%`, `FAR=9.32%`
+- 验证集最优：`threshold=0.285`, `Macro-F1=63.18%`, `FAR=6.48%`
+- 测试集最终：`Macro-F1=61.92%`, `FAR=6.33%`
+
+结论：相较 `cloud-base60-bohb-fine`（80.59 / 62.39 / 6.57），`base60_bohb60_fine` 的 `FAR` 继续下降了 `-0.24`，但 `Macro-F1` 反而下降了 `-0.47`，`Accuracy` 基本持平。这说明继续增加同一条线上的 `BOHB` 搜索预算，已经开始更偏向验证集拟合，而不是带来稳定的测试集提升。当前综合最优仍然是 `cloud-base60-bohb-fine`。
