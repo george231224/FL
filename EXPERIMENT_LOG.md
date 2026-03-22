@@ -210,6 +210,7 @@
 | cloud-base60-bohb-thr0275 | 80.70% | 62.36% | 6.26% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.275 |
 | cloud-base60-bohb-farcap650 | 80.69% | 62.37% | 6.31% | RTX4090, selector_v2(far_cap=6.50) 自动选门限0.280 |
 | cloud-base60-bohb-farcap645 | 80.70% | 62.36% | 6.26% | RTX4090, selector_v2(far_cap=6.45) 自动选门限0.275 |
+| cloud-feature20-mrmr | 78.75% | 60.33% | 7.64% | RTX4090, 20轮 smoke 控制组, feature_order=mrmr |
 
 ---
 
@@ -621,3 +622,35 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=62.36%`, `FAR=6.26%`
 
 结论：`base60_bohb_farcap645` 与手工指定的 `base60_bohb_thr0275` 达成了相同测试集结果，证明 `selector_v2` 已经可以覆盖“平衡版 `0.280`”和“低误报版 `0.275`”两条交付路径。到这一步，继续手工扫 `0.27x` 的价值已经很低；后续如果还要优化，应转向新的选择准则或特征排序，而不是重复门限微调。
+
+### UNSW-NB15 多分类 Non-IID feature20_mrmr（远端 20轮 smoke 控制组）
+- 目的：为后续 `corr_greedy / semantic_group` 两个特征排序方案建立同轮次、同配置的对照基线，避免拿 `20轮` 结果直接和 `60轮` 正式主线混比
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：`global_rounds=20`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `feature_order=mrmr`, `exp_tag=feature20_mrmr`
+- 最终分类器：`CNN+XGBoost(门限=0.300)`，`threshold_selector=baseline_penalty`
+- 归档目录：`results/archive/2026-03-22_180313_feature20_mrmr_2026-03-22_180338/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+- 代码变更：为 `UNSW-NB15` 增加 `feature_order` 可切换参数，当前支持 `mrmr / corr_greedy / semantic_group`
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 78.75% |
+| Precision | 86.16% |
+| Recall | 78.75% |
+| F1-Score | 80.99% |
+| Macro-Precision | 57.84% |
+| Macro-Recall | 74.02% |
+| Macro-F1 | 60.33% |
+| FAR | 7.64% |
+
+门限/配置摘要：
+- `feature_order=mrmr`
+- `normal_threshold=0.300`
+- `threshold_start=0.300`, `threshold_end=0.750`, `threshold_step=0.025`
+- `bohb=0`（仅做默认 stacking，不做 BOHB）
+
+训练过程观察：
+- 20轮短程 FL 训练的最佳验证点出现在第 `5` 轮，`best v_loss=0.4734`
+- 最终 `20/20` 轮时验证精度仍只有 `2.2%`，波动明显，说明在当前 `Non-IID + Borderline-SMOTE` 条件下，`20轮 smoke` 更适合比较“相对趋势”，不适合拿来判断绝对上限
+
+结论：`feature20_mrmr` 把 `20轮 smoke` 控制组基线固定在 `78.75 / 60.33 / 7.64`。后续 `corr_greedy` 和 `semantic_group` 只要能在同轮次下把 `Macro-F1` 提高约 `+0.2`，或者把 `FAR` 降低约 `-0.15`，就值得继续做完整归档和可能的 60 轮验证；否则这条“特征排序”方向优先级会明显低于当前自动门限主线。

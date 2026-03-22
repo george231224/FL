@@ -64,7 +64,7 @@ def get_device():
     return device
 
 
-def get_dataset(dataset_name, classification='multi'):
+def get_dataset(dataset_name, classification='multi', feature_order='mrmr'):
     """加载数据集"""
     print(f"\n正在加载数据集: {dataset_name}  分类模式: {classification}")
 
@@ -73,7 +73,10 @@ def get_dataset(dataset_name, classification='multi'):
         preprocessor = NSLKDDPreprocessor(classification=classification)
     elif dataset_name == 'UNSW-NB15':
         from data_preprocessing import UNSWNB15Preprocessor
-        preprocessor = UNSWNB15Preprocessor(classification=classification)
+        preprocessor = UNSWNB15Preprocessor(
+            classification=classification,
+            feature_order=feature_order,
+        )
     elif dataset_name == 'CIC-IDS2017':
         from data_preprocessing import CICIDS2017Preprocessor
         preprocessor = CICIDS2017Preprocessor(
@@ -144,7 +147,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
                 threshold_lambda=5.0,
                 bohb_cv_folds=3,
                 threshold_selector='baseline_penalty',
-                threshold_far_cap=None):
+                threshold_far_cap=None,
+                feature_order='mrmr'):
     print("=" * 60)
     print("FedPCNN ")
     print("=" * 60)
@@ -155,7 +159,11 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     ckpt_tag = _with_exp_suffix(f"{dataset_name}_{partition_type}_{classification}_v8", exp_tag)
 
     # 加载数据
-    X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(dataset_name, classification)
+    X_train, y_train, X_test, y_test, n_classes, n_features, class_names, n_continuous = get_dataset(
+        dataset_name,
+        classification,
+        feature_order=feature_order,
+    )
 
     # 拆分验证集（20%）
     X_train, X_val, y_train, y_val = train_test_split(
@@ -177,6 +185,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     print(f"  输入形状: {input_shape}")
     print(f"  类别数: {n_classes}")
     print(f"  数据划分: {partition_type.upper()}" + (f" (alpha={alpha})" if partition_type == 'non-iid' else ""))
+    if dataset_name == 'UNSW-NB15':
+        print(f"  特征排序: {feature_order}")
 
     # 初始化模型（n_continuous: CNN 只处理连续特征，OneHot 直连 XGBoost）
     fedpcnn = FedPCNN(
@@ -392,6 +402,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         'threshold_selector': threshold_selector,
         'threshold_far_cap': threshold_far_cap,
         'bohb_cv_folds': bohb_cv_folds,
+        'feature_order': feature_order,
     }
     if exp_tag:
         save_params['exp_tag'] = exp_tag
@@ -1097,6 +1108,10 @@ if __name__ == '__main__':
                         help='当 threshold-selector=far_cap 时使用的 FAR 上限')
     parser.add_argument('--bohb-cv-folds', type=int, default=3,
                         help='BOHB 搜索 Meta-XGBoost 时的交叉验证折数')
+    parser.add_argument('--feature-order', type=str,
+                        choices=['mrmr', 'corr_greedy', 'semantic_group'],
+                        default='mrmr',
+                        help='UNSW-NB15 连续特征顺序: mrmr / corr_greedy / semantic_group')
 
     args = parser.parse_args()
 
@@ -1127,7 +1142,8 @@ if __name__ == '__main__':
                         threshold_lambda=args.threshold_lambda,
                         bohb_cv_folds=args.bohb_cv_folds,
                         threshold_selector=args.threshold_selector,
-                        threshold_far_cap=args.threshold_far_cap)
+                        threshold_far_cap=args.threshold_far_cap,
+                        feature_order=args.feature_order)
         elif args.model == 'fedpcnn-2stage':
             run_fedpcnn_two_stage(args.dataset, args.partition, args.alpha, device,
                                   args.global_rounds, args.local_epochs, args.classification,

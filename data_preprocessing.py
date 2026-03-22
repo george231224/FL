@@ -143,11 +143,72 @@ def mrmr_feature_selection(X_df, y, categorical_cols=None, n_bins=15, threshold=
     return selected_cols
 
 
+def _greedy_correlation_order(X_df, feature_names, anchor_order):
+    """用贪心相关性把相似连续特征排到相邻位置。"""
+    if len(feature_names) <= 2:
+        return list(feature_names)
+
+    corr = X_df[feature_names].corr(method='spearman').abs().fillna(0.0)
+    rank = {name: idx for idx, name in enumerate(anchor_order)}
+    ordered = [anchor_order[0]]
+    remaining = set(feature_names)
+    remaining.remove(anchor_order[0])
+
+    while remaining:
+        tail = ordered[-1]
+        next_feat = max(
+            remaining,
+            key=lambda name: (float(corr.loc[tail, name]), -rank[name])
+        )
+        ordered.append(next_feat)
+        remaining.remove(next_feat)
+    return ordered
+
+
+def _unsw_semantic_group(feature_name):
+    """UNSW-NB15 连续特征的粗粒度语义分组。"""
+    groups = [
+        ({'dur', 'rate'}, 0),
+        ({'sbytes', 'sload', 'smean', 'sloss', 'spkts', 'sttl', 'stcpb', 'sjit', 'swin', 'sinpkt'}, 1),
+        ({'dbytes', 'dload', 'dmean', 'dloss', 'dpkts', 'dttl', 'dtcpb', 'djit', 'dwin', 'dinpkt'}, 2),
+        ({'tcprtt', 'synack', 'ackdat'}, 3),
+        ({'response_body_len', 'trans_depth', 'is_sm_ips_ports'}, 4),
+    ]
+    for features, group_id in groups:
+        if feature_name in features:
+            return group_id
+    if feature_name.startswith('ct_'):
+        return 5
+    return 6
+
+
+def reorder_unsw_feature_columns(X_train_df, selected_cols, categorical_cols, strategy='mrmr'):
+    """重排 UNSW-NB15 特征列，保持类别特征始终位于末尾。"""
+    selected_cat_cols = [c for c in categorical_cols if c in selected_cols]
+    selected_num_cols = [c for c in selected_cols if c not in selected_cat_cols]
+
+    if strategy == 'mrmr':
+        ordered_num_cols = list(selected_num_cols)
+    elif strategy == 'corr_greedy':
+        ordered_num_cols = _greedy_correlation_order(X_train_df, selected_num_cols, selected_num_cols)
+    elif strategy == 'semantic_group':
+        mrmr_rank = {name: idx for idx, name in enumerate(selected_num_cols)}
+        ordered_num_cols = sorted(
+            selected_num_cols,
+            key=lambda name: (_unsw_semantic_group(name), mrmr_rank[name])
+        )
+    else:
+        raise ValueError(f"不支持的特征排序策略: {strategy}")
+
+    return ordered_num_cols + selected_cat_cols, ordered_num_cols, selected_cat_cols
+
+
 class NSLKDDPreprocessor:
     # 多分类：5类标签名（用于打印和评估）
     MULTI_CLASS_NAMES = {0: 'Normal', 1: 'DoS', 2: 'Probe', 3: 'R2L', 4: 'U2R'}
 
-    def __init__(self, data_dir='./data', classification='multi', test_size=0.2, seed=42):
+    def __init__(self, data_dir='./data', classification='multi', test_size=0.2, seed=42,
+                 feature_order='mrmr'):
         """
         classification: 'binary' → Normal=0 / Attack=1
                         'multi'  → Normal=0 / DoS=1 / Probe=2 / R2L=3 / U2R=4
@@ -277,7 +338,8 @@ class UNSWNB15Preprocessor:
         7: 'Reconnaissance', 8: 'Shellcode', 9: 'Worms'
     }
 
-    def __init__(self, data_dir='./data', classification='multi', test_size=0.2, seed=42):
+    def __init__(self, data_dir='./data', classification='multi', test_size=0.2, seed=42,
+                 feature_order='mrmr'):
         """
         classification: 'binary' → Normal=0 / Attack=1  (使用 label 列)
                         'multi'  → Normal=0 + 9种攻击类型  (使用 attack_cat 列)
@@ -288,6 +350,7 @@ class UNSWNB15Preprocessor:
         self.classification = classification
         self.test_size = test_size
         self.seed = seed
+        self.feature_order = feature_order
         self.label_encoder = LabelEncoder()
 
     def load_and_preprocess(self):
@@ -360,16 +423,21 @@ class UNSWNB15Preprocessor:
             top_k=None,
             threshold=0.95
         )
-        self.selected_feature_names_ = selected_cols
+        final_selected_cols, selected_num_cols, selected_cat_cols = reorder_unsw_feature_columns(
+            X_train_df,
+            selected_cols,
+            categorical_cols=categorical_cols,
+            strategy=self.feature_order
+        )
+        self.mrmr_selected_feature_names_ = selected_cols
+        self.selected_feature_names_ = final_selected_cols
+        self.selected_num_cols_ = selected_num_cols
+        self.selected_cat_cols_ = selected_cat_cols
+        self.feature_order_strategy_ = self.feature_order
 
         # 仅保留选中的列（.copy() 避免 SettingWithCopyWarning 和视图问题）
-        X_train_df = X_train_df[selected_cols].copy()
-        X_test_df  = X_test_df[selected_cols].copy()
-
-        # 分类特征 → LabelEncoding（不做 OneHot，贴近论文）
-        # 连续特征 → RobustScaler
-        selected_cat_cols = [c for c in categorical_cols if c in selected_cols]
-        selected_num_cols = [c for c in selected_cols if c not in selected_cat_cols]
+        X_train_df = X_train_df[final_selected_cols].copy()
+        X_test_df  = X_test_df[final_selected_cols].copy()
 
         # LabelEncoding: 分类特征转为整数编码
         self._label_encoders = {}
@@ -383,30 +451,23 @@ class UNSWNB15Preprocessor:
 
         # ColumnTransformer: 全部用 RobustScaler（LabelEncoded 列也做缩放）
         ct = ColumnTransformer(transformers=[
-            ('num', RobustScaler(quantile_range=(10, 90)), selected_cols),
+            ('num', RobustScaler(quantile_range=(10, 90)), final_selected_cols),
         ])
         X_train = ct.fit_transform(X_train_df)
         X_test  = ct.transform(X_test_df)
         self.column_transformer_ = ct
 
-        # [修改3] 记录连续特征数量（排除类别特征）和类别特征索引
         # CNN 只处理前 n_continuous_ 列（连续特征），类别特征在后面
-        # 数据列顺序: 连续特征在前，类别特征在后
-        # 重排列: 把连续列放前面，类别列放后面
-        num_indices = [selected_cols.index(c) for c in selected_num_cols]
-        cat_indices = [selected_cols.index(c) for c in selected_cat_cols]
-        reorder = num_indices + cat_indices
-        X_train = X_train[:, reorder]
-        X_test = X_test[:, reorder]
         self.n_continuous_ = len(selected_num_cols)  # CNN 只处理前这么多列
         self.n_categorical_ = len(selected_cat_cols)  # 类别特征数量
         # 记录各类别特征的类别数（用于 embedding）
         self.cat_cardinalities_ = [len(self._label_encoders[c].classes_) for c in selected_cat_cols]
-        self.selected_cat_cols_ = selected_cat_cols
 
         # 打印维度信息
         print(f"\n[预处理] LabelEncoding + RobustScaler")
+        print(f"  连续特征排序策略: {self.feature_order}")
         print(f"  连续特征: {len(selected_num_cols)} 列 (→ CNN)")
+        print(f"  连续特征顺序前10: {selected_num_cols[:10]}")
         if selected_cat_cols:
             print(f"  类别特征: {selected_cat_cols} → LabelEncoding (→ XGBoost, 不进 CNN)")
             print(f"  类别基数: {dict(zip(selected_cat_cols, self.cat_cardinalities_))}")
