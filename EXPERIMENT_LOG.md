@@ -205,6 +205,7 @@
 | cloud-base60-bohb-fine | 80.59% | 62.39% | 6.57% | RTX4090, 复用base60主干 + BOHB + 门限0.30 |
 | cloud-base60-bohb60-fine | 80.58% | 61.92% | 6.33% | RTX4090, 复用base60主干 + 60次BOHB + 门限0.285 |
 | cloud-base60-bohb5cv-fine | 80.53% | 61.76% | 6.75% | RTX4090, 复用base60主干 + BOHB(5-fold CV) + 门限0.295 |
+| cloud-base60-bohb-thr0280 | 80.69% | 62.37% | 6.31% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.280 |
 
 ---
 
@@ -447,3 +448,43 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=61.76%`, `FAR=6.75%`
 
 结论：相较 `cloud-base60-bohb-fine`（80.59 / 62.39 / 6.57），`base60_bohb5cv_fine` 的 `Accuracy` 下降了 `-0.06`，`Macro-F1` 下降了 `-0.63`，`FAR` 也回升了 `+0.18`。这说明把 Meta-XGBoost 的交叉验证从 `3-fold` 提到 `5-fold`，并没有减少测试集过拟合，反而削弱了当前最优主线。结合 `base60_bohb60_fine` 的负结果，可以确认后续不应继续沿“增加 BOHB 搜索保守性/预算”这条线投入时间。
+
+### UNSW-NB15 多分类 Non-IID base60_bohb_thr0280（远端 60轮主干 + 显式门限0.280）
+- 目的：验证在 `base60_bohb_fine` 同一条主线上，不改主干也不改 `BOHB` 搜索，只把最终 Normal 门限从自动选出的 `0.300` 固定到验证曲线更保守的 `0.280`，是否能显著降低测试集 `FAR`
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：复用 `base60` 主干, `global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=30`, `bohb_cv_folds=3`, `exp_tag=base60_bohb_thr0280`
+- 复用模型：`./results/models/FedPCNN_UNSW-NB15_non-iid_multi_base60_model.pt`
+- 门限搜索：`threshold_start=0.280`, `threshold_end=0.280`, `threshold_step=0.005`, `threshold_lambda=5.0`（等价于显式固定 `normal_threshold=0.280`）
+- 最终分类器：`CNN+XGBoost(门限=0.28)`，实际最优 `normal_threshold=0.280`
+- 归档目录：`results/archive/2026-03-22_142226_base60_bohb_thr0280_2026-03-22_142253/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.69% |
+| Precision | 85.21% |
+| Recall | 80.69% |
+| F1-Score | 81.88% |
+| Macro-Precision | 59.94% |
+| Macro-Recall | 69.56% |
+| Macro-F1 | 62.37% |
+| FAR | 6.31% |
+
+BOHB 最优参数：
+- `n_estimators=145`
+- `max_depth=8`
+- `learning_rate=0.1447`
+- `subsample=0.8055`
+- `colsample_bytree=0.7040`
+- `min_child_weight=6`
+- `gamma=0.6257`
+- `reg_alpha=0.5819`
+- `reg_lambda=0.0249`
+- `best_cv_macro_f1=60.91`
+
+门限搜索摘要：
+- 无门限 baseline：`Macro-F1=62.23%`, `FAR=9.70%`
+- 显式门限：`threshold=0.280`, `Macro-F1=62.63%`, `FAR=6.49%`（验证集）
+- 测试集最终：`Macro-F1=62.37%`, `FAR=6.31%`
+
+结论：相较 `cloud-base60-bohb-fine`（80.59 / 62.39 / 6.57），`base60_bohb_thr0280` 的 `Accuracy` 提升了 `+0.10`，`Macro-F1` 只下降了 `-0.02`，但 `FAR` 明显下降了 `-0.26`。这说明当前主线的主要改进空间确实在“门限选择”而不是“主干或 BOHB 再加预算”。如果客户更看重综合稳定性和误报控制，这轮已经比 `base60_bohb_fine` 更适合作为交付候选；如果继续追 `Macro-F1` 极限，下一步最值得试的是同一条线上把显式门限微调到 `0.285` 或 `0.290`。
