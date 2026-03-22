@@ -211,6 +211,7 @@
 | cloud-base60-bohb-farcap650 | 80.69% | 62.37% | 6.31% | RTX4090, selector_v2(far_cap=6.50) 自动选门限0.280 |
 | cloud-base60-bohb-farcap645 | 80.70% | 62.36% | 6.26% | RTX4090, selector_v2(far_cap=6.45) 自动选门限0.275 |
 | cloud-feature20-mrmr | 78.75% | 60.33% | 7.64% | RTX4090, 20轮 smoke 控制组, feature_order=mrmr |
+| cloud-feature20-corr-greedy | 79.02% | 59.95% | 7.37% | RTX4090, 20轮 smoke, feature_order=corr_greedy |
 
 ---
 
@@ -654,3 +655,29 @@ BOHB 最优参数：
 - 最终 `20/20` 轮时验证精度仍只有 `2.2%`，波动明显，说明在当前 `Non-IID + Borderline-SMOTE` 条件下，`20轮 smoke` 更适合比较“相对趋势”，不适合拿来判断绝对上限
 
 结论：`feature20_mrmr` 把 `20轮 smoke` 控制组基线固定在 `78.75 / 60.33 / 7.64`。后续 `corr_greedy` 和 `semantic_group` 只要能在同轮次下把 `Macro-F1` 提高约 `+0.2`，或者把 `FAR` 降低约 `-0.15`，就值得继续做完整归档和可能的 60 轮验证；否则这条“特征排序”方向优先级会明显低于当前自动门限主线。
+
+### UNSW-NB15 多分类 Non-IID feature20_corr_greedy（远端 20轮 smoke，相关性重排）
+- 目的：验证把连续特征从原始 `MRMR` 顺序改成“按相邻相关性贪心衔接”后，是否能让 `1D CNN` 的局部卷积归纳偏置更合理
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：`global_rounds=20`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `feature_order=corr_greedy`, `exp_tag=feature20_corr_greedy`
+- 最终分类器：`CNN+XGBoost(门限=0.300)`，`threshold_selector=baseline_penalty`
+- 归档目录：`results/archive/2026-03-22_183054_feature20_corr_greedy_2026-03-22_190236/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 79.02% |
+| Precision | 86.11% |
+| Recall | 79.02% |
+| F1-Score | 81.15% |
+| Macro-Precision | 57.42% |
+| Macro-Recall | 73.53% |
+| Macro-F1 | 59.95% |
+| FAR | 7.37% |
+
+对照 `feature20_mrmr`（78.75 / 60.33 / 7.64）：
+- `Accuracy +0.27`
+- `Macro-F1 -0.39`
+- `FAR -0.27`
+
+结论：`corr_greedy` 在 `20轮 smoke` 上确实改善了 `Accuracy/FAR`，但明显拉低了 `Macro-F1`。这说明“把相关特征排在一起”未必对当前 `FedPCNN` 更有利，它更像是在增强 `Normal/Attack` 边界而不是提升多分类整体均衡性。按现有结果，这条排序方向暂时不满足继续做 `60轮` 验证的条件。

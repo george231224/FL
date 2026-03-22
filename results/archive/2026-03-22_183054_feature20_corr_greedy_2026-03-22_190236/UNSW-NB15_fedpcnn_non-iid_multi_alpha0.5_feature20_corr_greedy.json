@@ -1,0 +1,36 @@
+{
+    "timestamp": "2026-03-22 18:30:54",
+    "dataset": "UNSW-NB15",
+    "model": "fedpcnn",
+    "partition": "non-iid",
+    "alpha": 0.5,
+    "classification": "multi",
+    "metrics": {
+        "Accuracy": 79.02396429610944,
+        "Precision": 86.11407952027133,
+        "Recall": 79.02396429610944,
+        "F1-Score": 81.15450732328222,
+        "Macro-Precision": 57.42209215432936,
+        "Macro-Recall": 73.53345641995934,
+        "Macro-F1": 59.946805147163694,
+        "FAR": 7.3666659320819265
+    },
+    "params": {
+        "num_devices": 10,
+        "global_rounds": 20,
+        "local_epochs": 5,
+        "batch_size": 256,
+        "lr": 0.005,
+        "classifier": "CNN+XGBoost(门限=0.3)",
+        "normal_threshold": 0.3,
+        "threshold_start": 0.3,
+        "threshold_end": 0.75,
+        "threshold_step": 0.025,
+        "threshold_lambda": 5.0,
+        "threshold_selector": "baseline_penalty",
+        "threshold_far_cap": null,
+        "bohb_cv_folds": 3,
+        "feature_order": "corr_greedy",
+        "exp_tag": "feature20_corr_greedy"
+    }
+}
