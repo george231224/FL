@@ -35,6 +35,13 @@ def _with_exp_suffix(base, exp_tag=None):
     return f"{base}_{exp_tag}" if exp_tag else base
 
 
+def _format_threshold(threshold):
+    """统一门限显示精度，避免 0.275 / 0.285 都显示成 0.28。"""
+    if threshold is None:
+        return "None"
+    return f"{float(threshold):.3f}".rstrip('0').rstrip('.')
+
+
 def set_seed(seed=42):
     """设置随机种子"""
     import random
@@ -135,7 +142,9 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
                 pretrained_model_path=None,
                 threshold_start=0.30, threshold_end=0.75, threshold_step=0.025,
                 threshold_lambda=5.0,
-                bohb_cv_folds=3):
+                bohb_cv_folds=3,
+                threshold_selector='baseline_penalty',
+                threshold_far_cap=None):
     print("=" * 60)
     print("FedPCNN ")
     print("=" * 60)
@@ -333,6 +342,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
             threshold_start=threshold_start,
             threshold_end=threshold_end,
             threshold_step=threshold_step,
+            selector=threshold_selector,
+            far_cap=threshold_far_cap,
         )
 
     # XGBoost 评估（无门限 baseline + 有门限）
@@ -343,7 +354,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     if normal_threshold is not None:
         metrics_xgb, xgb_preds, xgb_labels = fedpcnn.evaluate_with_svm(
             X_test, y_test, normal_threshold=normal_threshold)
-        print(f"  XGBoost (门限={normal_threshold:.2f}): Acc={metrics_xgb['Accuracy']:.2f}%, "
+        print(f"  XGBoost (门限={_format_threshold(normal_threshold)}): Acc={metrics_xgb['Accuracy']:.2f}%, "
               f"Macro-F1={metrics_xgb['Macro-F1']:.2f}%, FAR={metrics_xgb['FAR']:.2f}%")
     else:
         metrics_xgb, xgb_preds, xgb_labels = metrics_xgb_raw, None, None
@@ -358,7 +369,10 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         best_path = "CNN(校准)" if use_logit_cal else "CNN"
     else:
         metrics = metrics_xgb
-        best_path = f"CNN+XGBoost(门限={normal_threshold:.2f})" if normal_threshold else "CNN+XGBoost"
+        best_path = (
+            f"CNN+XGBoost(门限={_format_threshold(normal_threshold)})"
+            if normal_threshold is not None else "CNN+XGBoost"
+        )
     print(f"\n  最终选择: {best_path} (Macro-F1: CNN={cnn_f1:.2f}% vs XGBoost={xgb_f1:.2f}%)")
 
     # ── 评估完成，立即保存结果和完整模型权重 ─────────────────────────────
@@ -375,6 +389,8 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         'threshold_end': threshold_end,
         'threshold_step': threshold_step,
         'threshold_lambda': threshold_lambda,
+        'threshold_selector': threshold_selector,
+        'threshold_far_cap': threshold_far_cap,
         'bohb_cv_folds': bohb_cv_folds,
     }
     if exp_tag:
@@ -1073,6 +1089,12 @@ if __name__ == '__main__':
                         help='Normal 门限搜索步长')
     parser.add_argument('--threshold-lambda', type=float, default=5.0,
                         help='Normal 门限搜索中的 FAR 惩罚系数')
+    parser.add_argument('--threshold-selector', type=str,
+                        choices=['baseline_penalty', 'absolute_penalty', 'far_cap'],
+                        default='baseline_penalty',
+                        help='Normal 门限选择策略: baseline_penalty / absolute_penalty / far_cap')
+    parser.add_argument('--threshold-far-cap', type=float, default=None,
+                        help='当 threshold-selector=far_cap 时使用的 FAR 上限')
     parser.add_argument('--bohb-cv-folds', type=int, default=3,
                         help='BOHB 搜索 Meta-XGBoost 时的交叉验证折数')
 
@@ -1103,7 +1125,9 @@ if __name__ == '__main__':
                         threshold_end=args.threshold_end,
                         threshold_step=args.threshold_step,
                         threshold_lambda=args.threshold_lambda,
-                        bohb_cv_folds=args.bohb_cv_folds)
+                        bohb_cv_folds=args.bohb_cv_folds,
+                        threshold_selector=args.threshold_selector,
+                        threshold_far_cap=args.threshold_far_cap)
         elif args.model == 'fedpcnn-2stage':
             run_fedpcnn_two_stage(args.dataset, args.partition, args.alpha, device,
                                   args.global_rounds, args.local_epochs, args.classification,

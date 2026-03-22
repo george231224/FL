@@ -1531,7 +1531,8 @@ class FedPCNN:
         return metrics, all_preds, labels
 
     def search_normal_threshold(self, X_val, y_val, batch_size=256, far_penalty_lambda=5.0,
-                                threshold_start=0.30, threshold_end=0.75, threshold_step=0.025):
+                                threshold_start=0.30, threshold_end=0.75, threshold_step=0.025,
+                                selector='baseline_penalty', far_cap=None):
         """在验证集上搜索最优 Normal 门限（带 FAR 约束）
 
         [修改2] 原版只按 Macro-F1 选最优门限，导致 FAR 上涨。
@@ -1541,10 +1542,21 @@ class FedPCNN:
         这样在 Macro-F1 提升不足以补偿 FAR 恶化时，会优先保持低 FAR。
 
         参数:
-            far_penalty_lambda: FAR 惩罚系数，默认 10.0（FAR 每涨 1% 扣 10 分 Macro-F1）
+            far_penalty_lambda: FAR 惩罚系数
+            selector: 门限选择策略
+                - baseline_penalty: score = F1 - λ * max(0, FAR - FAR_baseline)
+                - absolute_penalty: score = F1 - λ * FAR
+                - far_cap: 在 FAR <= far_cap 的候选中选最高 Macro-F1
+            far_cap: selector=far_cap 时的 FAR 上限
         搜索范围默认：0.30 ~ 0.75，步长 0.025
         """
         from sklearn.metrics import f1_score, confusion_matrix
+
+        valid_selectors = {'baseline_penalty', 'absolute_penalty', 'far_cap'}
+        if selector not in valid_selectors:
+            raise ValueError(f"不支持的 threshold selector: {selector}")
+        if selector == 'far_cap' and far_cap is None:
+            raise ValueError("selector='far_cap' 时必须提供 far_cap")
 
         print("\n搜索最优 Normal 门限（带 FAR 约束）...")
         print(f"  搜索区间: [{threshold_start:.3f}, {threshold_end:.3f}], 步长={threshold_step:.3f}")
@@ -1566,14 +1578,16 @@ class FedPCNN:
         fpr_base = cm_base[0, 1:].sum() / normal_total_base if normal_total_base > 0 else 0.0
         fnr_base = cm_base[1:, 0].sum() / attack_total_base if attack_total_base > 0 else 0.0
         far_baseline = (fpr_base + fnr_base) / 2 * 100
+        baseline_acc = 100 * (baseline_preds == labels).mean()
         baseline_f1 = f1_score(labels, baseline_preds, average='macro', zero_division=0) * 100
-        print(f"  Baseline (无门限): Macro-F1={baseline_f1:.2f}%, FAR={far_baseline:.2f}%")
-        print(f"  FAR 惩罚系数 λ={far_penalty_lambda} (FAR 每涨 1% 扣 {far_penalty_lambda} 分)")
+        print(f"  Baseline (无门限): Acc={baseline_acc:.2f}%, Macro-F1={baseline_f1:.2f}%, FAR={far_baseline:.2f}%")
+        if selector == 'far_cap':
+            print(f"  选择策略: FAR cap (FAR <= {far_cap:.2f}% 时选最高 Macro-F1)")
+        elif selector == 'absolute_penalty':
+            print(f"  选择策略: absolute_penalty, score = F1 - λ * FAR, λ={far_penalty_lambda}")
+        else:
+            print(f"  选择策略: baseline_penalty, score = F1 - λ * max(0, FAR - FAR_baseline), λ={far_penalty_lambda}")
 
-        best_threshold = None
-        best_score = -1.0
-        best_far = far_baseline
-        best_f1 = baseline_f1
         results = []
 
         thresholds = np.arange(threshold_start, threshold_end + threshold_step * 0.5, threshold_step)
@@ -1588,30 +1602,74 @@ class FedPCNN:
             fnr = cm[1:, 0].sum() / attack_total if attack_total > 0 else 0.0
             far = (fpr + fnr) / 2 * 100
 
-            # [修改2] 带 FAR 约束的评分: score = F1 - λ * max(0, FAR - baseline)
             far_excess = max(0.0, far - far_baseline)
-            score = macro_f1 - far_penalty_lambda * far_excess
+            score_baseline_penalty = macro_f1 - far_penalty_lambda * far_excess
+            score_absolute_penalty = macro_f1 - far_penalty_lambda * far
 
-            results.append((t, acc, macro_f1, far, score))
-            marker = " *" if score > best_score else ""
-            print(f"  threshold={t:.3f} → Acc={acc:.2f}%, Macro-F1={macro_f1:.2f}%, "
-                  f"FAR={far:.2f}%, score={score:.2f}{marker}")
+            row = {
+                'threshold': float(t),
+                'acc': float(acc),
+                'macro_f1': float(macro_f1),
+                'far': float(far),
+                'score_baseline_penalty': float(score_baseline_penalty),
+                'score_absolute_penalty': float(score_absolute_penalty),
+                'within_cap': (far_cap is not None and far <= far_cap),
+            }
+            results.append(row)
 
-            if score > best_score:
-                best_score = score
-                best_threshold = t
-                best_far = far
-                best_f1 = macro_f1
+            if selector == 'far_cap':
+                extra = "within_cap=Y" if row['within_cap'] else "within_cap=N"
+            elif selector == 'absolute_penalty':
+                extra = f"score={score_absolute_penalty:.2f}"
+            else:
+                extra = f"score={score_baseline_penalty:.2f}"
+            print(f"  threshold={t:.3f} → Acc={acc:.2f}%, Macro-F1={macro_f1:.2f}%, FAR={far:.2f}%, {extra}")
 
-        # [修改2] 如果最佳门限没有比 baseline 更好，返回 None（不使用门限）
-        baseline_score = baseline_f1  # baseline FAR excess = 0
-        if best_score <= baseline_score:
+        def pick_by_score(key):
+            return max(results, key=lambda r: (r[key], r['macro_f1'], -r['far'], r['acc']))
+
+        best = None
+        best_score = None
+        baseline_score = None
+
+        if selector == 'absolute_penalty':
+            best = pick_by_score('score_absolute_penalty')
+            best_score = best['score_absolute_penalty']
+            baseline_score = baseline_f1 - far_penalty_lambda * far_baseline
+        elif selector == 'far_cap':
+            candidates = [r for r in results if r['within_cap']]
+            if not candidates:
+                print(f"\n  没有候选满足 FAR <= {far_cap:.2f}%，回退到 baseline_penalty")
+                best = pick_by_score('score_baseline_penalty')
+                best_score = best['score_baseline_penalty']
+                baseline_score = baseline_f1
+            else:
+                best = max(candidates, key=lambda r: (r['macro_f1'], -r['far'], r['acc'], -r['threshold']))
+                best_score = best['macro_f1']
+                if far_baseline <= far_cap:
+                    baseline_score = baseline_f1
+                    if (baseline_f1, -far_baseline, baseline_acc) >= (best['macro_f1'], -best['far'], best['acc']):
+                        print(f"\n  Baseline 已满足 FAR cap 且不劣于最佳门限，不使用门限")
+                        return None
+        else:
+            best = pick_by_score('score_baseline_penalty')
+            best_score = best['score_baseline_penalty']
+            baseline_score = baseline_f1
+
+        if baseline_score is not None and best_score <= baseline_score:
             print(f"\n  门限搜索未找到优于 baseline 的配置，不使用门限")
             print(f"  Baseline score={baseline_score:.2f} vs best threshold score={best_score:.2f}")
             return None
 
-        print(f"\n  最优门限: {best_threshold:.3f} (Macro-F1={best_f1:.2f}%, FAR={best_far:.2f}%, score={best_score:.2f})")
-        return best_threshold
+        if selector == 'absolute_penalty':
+            score_info = f", score={best['score_absolute_penalty']:.2f}"
+        elif selector == 'far_cap':
+            score_info = f", selector=far_cap({far_cap:.2f}%)"
+        else:
+            score_info = f", score={best['score_baseline_penalty']:.2f}"
+
+        print(f"\n  最优门限: {best['threshold']:.3f} (Macro-F1={best['macro_f1']:.2f}%, FAR={best['far']:.2f}%{score_info})")
+        return best['threshold']
 
     def predict_with_svm(self, X, batch_size=256):
         """CNN+Stacking 纯预测（无需标签，用于两阶段推理链）
