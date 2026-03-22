@@ -209,6 +209,7 @@
 | cloud-base60-bohb-thr0285 | 80.66% | 62.37% | 6.37% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.285 |
 | cloud-base60-bohb-thr0275 | 80.70% | 62.36% | 6.26% | RTX4090, 复用base60主干 + 同BOHB参数 + 显式门限0.275 |
 | cloud-base60-bohb-farcap650 | 80.69% | 62.37% | 6.31% | RTX4090, selector_v2(far_cap=6.50) 自动选门限0.280 |
+| cloud-base60-bohb-farcap645 | 80.70% | 62.36% | 6.26% | RTX4090, selector_v2(far_cap=6.45) 自动选门限0.275 |
 
 ---
 
@@ -588,3 +589,35 @@ BOHB 最优参数：
 - 测试集最终：`Macro-F1=62.37%`, `FAR=6.31%`
 
 结论：`base60_bohb_farcap650` 与手工指定的 `base60_bohb_thr0280` 达成了相同测试集结果，证明新的 `selector_v2` 已经可以把“平衡版门限”自动化，而不必继续手工盲扫 `0.28x`。这也说明下一步实验应该沿“更严格的 `far_cap` 自动选低误报解”继续，而不是回到手工调门限。
+
+### UNSW-NB15 多分类 Non-IID base60_bohb_farcap645（远端 60轮主干 + selector_v2 far_cap=6.45）
+- 目的：在 `base60_bohb_farcap650` 已自动复现 `0.280` 平衡解后，进一步收紧 `FAR cap`，验证 `selector_v2` 是否会稳定切换到当前低误报交付点 `0.275`
+- 服务器：SeeTa Cloud RTX 4090 24GB（PyTorch 2.5.1 + CUDA 12.4, Python 3.12）
+- 配置：复用 `base60` 主干, `global_rounds=60`, `alpha=0.5`, `seed=42`, `local_epochs=5`, `lr=0.005`, `bohb=30`, `bohb_cv_folds=3`, `exp_tag=base60_bohb_farcap645`
+- 复用模型：`./results/models/FedPCNN_UNSW-NB15_non-iid_multi_base60_model.pt`
+- 门限搜索：`threshold_start=0.260`, `threshold_end=0.340`, `threshold_step=0.005`, `threshold_lambda=5.0`, `threshold_selector=far_cap`, `threshold_far_cap=6.45`
+- 最终分类器：`CNN+XGBoost(门限=0.275)`，自动选中 `normal_threshold=0.275`
+- 归档目录：`results/archive/2026-03-22_172220_base60_bohb_farcap645_2026-03-22_172229/`
+- 图表产物：`loss / confusion_matrix / metrics / per_class / comparison` 共5张
+
+| 指标 | 结果 |
+|------|------|
+| Accuracy | 80.70% |
+| Precision | 85.19% |
+| Recall | 80.70% |
+| F1-Score | 81.88% |
+| Macro-Precision | 59.96% |
+| Macro-Recall | 69.51% |
+| Macro-F1 | 62.36% |
+| FAR | 6.26% |
+
+BOHB 最优参数：
+- 与 `base60_bohb_farcap650 / base60_bohb_thr0275 / base60_bohb_thr0280 / base60_bohb_fine` 一致：`n_estimators=145`, `max_depth=8`, `learning_rate=0.1447`, `subsample=0.8055`, `colsample_bytree=0.7040`, `min_child_weight=6`, `gamma=0.6257`, `reg_alpha=0.5819`, `reg_lambda=0.0249`
+- `best_cv_macro_f1=60.91`
+
+门限搜索摘要：
+- 无门限 baseline：`Macro-F1=62.23%`, `FAR=9.70%`
+- `selector_v2 far_cap=6.45` 自动筛选：`threshold=0.275`, `Macro-F1=62.62%`, `FAR=6.44%`（验证集）
+- 测试集最终：`Macro-F1=62.36%`, `FAR=6.26%`
+
+结论：`base60_bohb_farcap645` 与手工指定的 `base60_bohb_thr0275` 达成了相同测试集结果，证明 `selector_v2` 已经可以覆盖“平衡版 `0.280`”和“低误报版 `0.275`”两条交付路径。到这一步，继续手工扫 `0.27x` 的价值已经很低；后续如果还要优化，应转向新的选择准则或特征排序，而不是重复门限微调。
