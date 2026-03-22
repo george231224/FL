@@ -1529,7 +1529,8 @@ class FedPCNN:
 
         return metrics, all_preds, labels
 
-    def search_normal_threshold(self, X_val, y_val, batch_size=256, far_penalty_lambda=5.0):
+    def search_normal_threshold(self, X_val, y_val, batch_size=256, far_penalty_lambda=5.0,
+                                threshold_start=0.30, threshold_end=0.75, threshold_step=0.025):
         """在验证集上搜索最优 Normal 门限（带 FAR 约束）
 
         [修改2] 原版只按 Macro-F1 选最优门限，导致 FAR 上涨。
@@ -1540,11 +1541,12 @@ class FedPCNN:
 
         参数:
             far_penalty_lambda: FAR 惩罚系数，默认 10.0（FAR 每涨 1% 扣 10 分 Macro-F1）
-        搜索范围：0.3 ~ 0.7，步长 0.025（更精细）
+        搜索范围默认：0.30 ~ 0.75，步长 0.025
         """
         from sklearn.metrics import f1_score, confusion_matrix
 
         print("\n搜索最优 Normal 门限（带 FAR 约束）...")
+        print(f"  搜索区间: [{threshold_start:.3f}, {threshold_end:.3f}], 步长={threshold_step:.3f}")
         features, labels = self._extract_features_batch(X_val, y_val, batch_size)
         features_scaled = self.svm_scaler.transform(features)
 
@@ -1573,7 +1575,8 @@ class FedPCNN:
         best_f1 = baseline_f1
         results = []
 
-        for t in np.arange(0.30, 0.75, 0.025):
+        thresholds = np.arange(threshold_start, threshold_end + threshold_step * 0.5, threshold_step)
+        for t in thresholds:
             preds = np.where(proba[:, 0] >= t, 0, proba[:, 1:].argmax(axis=1) + 1)
             macro_f1 = f1_score(labels, preds, average='macro', zero_division=0) * 100
             acc = 100 * (preds == labels).mean()

@@ -1,0 +1,45 @@
+{
+    "timestamp": "2026-03-22 11:00:02",
+    "dataset": "UNSW-NB15",
+    "model": "fedpcnn",
+    "partition": "non-iid",
+    "alpha": 0.5,
+    "classification": "multi",
+    "metrics": {
+        "Accuracy": 80.36674104977199,
+        "Precision": 85.45435488037596,
+        "Recall": 80.36674104977199,
+        "F1-Score": 81.71811384885144,
+        "Macro-Precision": 59.230253681941335,
+        "Macro-Recall": 70.00044782011304,
+        "Macro-F1": 61.67193702988406,
+        "FAR": 6.515531161900843
+    },
+    "params": {
+        "num_devices": 10,
+        "global_rounds": 50,
+        "local_epochs": 5,
+        "batch_size": 256,
+        "lr": 0.005,
+        "classifier": "CNN+XGBoost(门限=0.28)",
+        "normal_threshold": 0.275,
+        "threshold_start": 0.26,
+        "threshold_end": 0.34,
+        "threshold_step": 0.005,
+        "threshold_lambda": 5.0,
+        "exp_tag": "bohb50_fine",
+        "pretrained_model_path": "./results/models/FedPCNN_UNSW-NB15_non-iid_multi_bohb50_model.pt",
+        "bohb_best_params": {
+            "n_estimators": 113,
+            "max_depth": 8,
+            "learning_rate": 0.1374213587196571,
+            "subsample": 0.7245042188206406,
+            "colsample_bytree": 0.5277193751821014,
+            "min_child_weight": 4,
+            "gamma": 0.6326598847663321,
+            "reg_alpha": 1.8444788537125651,
+            "reg_lambda": 0.019433174506300516
+        },
+        "bohb_best_cv_f1": 60.95
+    }
+}

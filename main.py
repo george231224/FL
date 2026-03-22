@@ -131,7 +131,10 @@ def partition_data(X_train, y_train, partition_type='iid', num_clients=10, alpha
 
 def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device='cpu',
                 global_rounds=50, local_epochs=5, classification='multi',
-                dynamic_agg=False, bohb_trials=0, exp_tag=None):
+                dynamic_agg=False, bohb_trials=0, exp_tag=None,
+                pretrained_model_path=None,
+                threshold_start=0.30, threshold_end=0.75, threshold_step=0.025,
+                threshold_lambda=5.0):
     print("=" * 60)
     print("FedPCNN ")
     print("=" * 60)
@@ -156,9 +159,6 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     # 配置
     num_devices = 10
 
-    #  关键：实际划分数据
-    client_data = partition_data(X_train, y_train, partition_type, num_devices, alpha)
-
     # 1D CNN 输入形状: (channels=1, total_features)
     input_shape = (1, n_features)
 
@@ -180,10 +180,6 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         fedpcnn.device = device
 
     fedpcnn.use_center_loss = False  # v8: 关闭 CenterLoss（v7 证明在极端不平衡下有害）
-
-    print("\n开始训练...")
-
-    client_data_list = [client_data[i] for i in range(num_devices)]
 
     # ── 按数据集分开配置 ──────────────────────────────────────────────────
     is_unsw = dataset_name.upper().startswith('UNSW')
@@ -214,33 +210,6 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         else:
             hp_lr, hp_mu, hp_local_epochs, hp_gamma, hp_focal_gamma = 0.005, 0.05, 5, 0.6, 1.5
 
-    # SMOTE + pre_smote_class_weights
-    pre_smote_class_weights = None
-    client_data_raw = None        # 保留原始数据用于预热
-    smote_warmup_rounds = 0
-    if use_smote:
-        pre_smote_labels = np.concatenate([y for _, y in client_data_list])
-        pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
-        # 简单逆频率权重（回退至历史最佳 378f261 配置）
-        # 1/counts 比 1/sqrt(counts) 对极端少数类（Worms=139）给予更强权重
-        cb_weights = 1.0 / pre_smote_counts
-        cw_cap = 30.0 if n_classes > 5 else 15.0
-        min_cw = cb_weights.min()
-        cb_weights = np.clip(cb_weights, 0, min_cw * cw_cap)
-        cb_weights = cb_weights / cb_weights.sum() * n_classes
-        pre_smote_class_weights = torch.FloatTensor(cb_weights)
-
-        # Non-IID 场景：取消SMOTE预热，从第1轮直接用SMOTE数据，避免切换震荡
-        if partition_type == 'non-iid':
-            client_data_raw = None
-            smote_warmup_rounds = 0
-
-        from data_preprocessing import apply_smote_per_client
-        client_data_list = apply_smote_per_client(
-            client_data_list, num_classes=n_classes,
-            dataset_name=dataset_name, classification=classification, k_neighbors=5,
-        )
-
     print(f"\n  配置 ({dataset_name}):")
     print(f"    lr={hp_lr}, mu={hp_mu}, local_epochs={hp_local_epochs}, "
           f"gamma={hp_gamma}, focal_gamma={hp_focal_gamma}")
@@ -249,27 +218,71 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
           f"Logit校准={'ON' if use_logit_cal else 'OFF'}, "
           f"动态聚合={'ON' if dynamic_agg else 'OFF'}")
 
-    # [修改1] 将 dynamic_agg 开关传给 train()，真正启用/禁用动态聚合
-    train_loss, val_loss = fedpcnn.train(
-        client_data=client_data_list,
-        global_rounds=global_rounds,
-        local_epochs=hp_local_epochs,
-        client_fraction=1.0 if (partition_type != 'iid' or n_classes == 2) else 0.7,
-        batch_size=256,
-        lr=hp_lr,
-        mu=hp_mu,
-        gamma=hp_gamma,
-        focal_gamma=hp_focal_gamma,
-        alpha=alpha,
-        X_val=X_val,
-        y_val=y_val,
-        eval_interval=5,
-        pre_smote_class_weights=pre_smote_class_weights,
-        client_data_raw=client_data_raw,
-        smote_warmup_rounds=smote_warmup_rounds,
-        checkpoint_tag=ckpt_tag,
-        dynamic_aggregation=dynamic_agg,
-    )
+    train_loss, val_loss = [], []
+    if pretrained_model_path:
+        print("\n跳过 FL 训练，加载已有主干模型...")
+        pretrained_state = torch.load(pretrained_model_path, map_location=device)
+        if 'global_model' not in pretrained_state:
+            raise KeyError(f"预训练模型缺少 global_model: {pretrained_model_path}")
+        fedpcnn.global_model.load_state_dict(pretrained_state['global_model'])
+        train_loss = pretrained_state.get('train_loss', []) or []
+        val_loss = pretrained_state.get('val_loss', []) or []
+        print(f"  已加载: {pretrained_model_path}")
+    else:
+        print("\n开始训练...")
+
+        # 关键：实际划分数据
+        client_data = partition_data(X_train, y_train, partition_type, num_devices, alpha)
+        client_data_list = [client_data[i] for i in range(num_devices)]
+
+        # SMOTE + pre_smote_class_weights
+        pre_smote_class_weights = None
+        client_data_raw = None        # 保留原始数据用于预热
+        smote_warmup_rounds = 0
+        if use_smote:
+            pre_smote_labels = np.concatenate([y for _, y in client_data_list])
+            pre_smote_counts = np.maximum(np.bincount(pre_smote_labels, minlength=n_classes), 1).astype(float)
+            # 简单逆频率权重（回退至历史最佳 378f261 配置）
+            # 1/counts 比 1/sqrt(counts) 对极端少数类（Worms=139）给予更强权重
+            cb_weights = 1.0 / pre_smote_counts
+            cw_cap = 30.0 if n_classes > 5 else 15.0
+            min_cw = cb_weights.min()
+            cb_weights = np.clip(cb_weights, 0, min_cw * cw_cap)
+            cb_weights = cb_weights / cb_weights.sum() * n_classes
+            pre_smote_class_weights = torch.FloatTensor(cb_weights)
+
+            # Non-IID 场景：取消SMOTE预热，从第1轮直接用SMOTE数据，避免切换震荡
+            if partition_type == 'non-iid':
+                client_data_raw = None
+                smote_warmup_rounds = 0
+
+            from data_preprocessing import apply_smote_per_client
+            client_data_list = apply_smote_per_client(
+                client_data_list, num_classes=n_classes,
+                dataset_name=dataset_name, classification=classification, k_neighbors=5,
+            )
+
+        # [修改1] 将 dynamic_agg 开关传给 train()，真正启用/禁用动态聚合
+        train_loss, val_loss = fedpcnn.train(
+            client_data=client_data_list,
+            global_rounds=global_rounds,
+            local_epochs=hp_local_epochs,
+            client_fraction=1.0 if (partition_type != 'iid' or n_classes == 2) else 0.7,
+            batch_size=256,
+            lr=hp_lr,
+            mu=hp_mu,
+            gamma=hp_gamma,
+            focal_gamma=hp_focal_gamma,
+            alpha=alpha,
+            X_val=X_val,
+            y_val=y_val,
+            eval_interval=5,
+            pre_smote_class_weights=pre_smote_class_weights,
+            client_data_raw=client_data_raw,
+            smote_warmup_rounds=smote_warmup_rounds,
+            checkpoint_tag=ckpt_tag,
+            dynamic_aggregation=dynamic_agg,
+        )
 
     # ── 训练完成，立即保存模型权重（防止后续步骤中断丢失） ──────────────
     import torch as _torch
@@ -308,7 +321,13 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     # 多分类门限搜索：在验证集上搜索最优 Normal 门限以降低 FAR
     normal_threshold = None
     if n_classes > 2:
-        normal_threshold = fedpcnn.search_normal_threshold(X_val, y_val)
+        normal_threshold = fedpcnn.search_normal_threshold(
+            X_val, y_val,
+            far_penalty_lambda=threshold_lambda,
+            threshold_start=threshold_start,
+            threshold_end=threshold_end,
+            threshold_step=threshold_step,
+        )
 
     # XGBoost 评估（无门限 baseline + 有门限）
     metrics_xgb_raw, _, _ = fedpcnn.evaluate_with_svm(X_test, y_test)
@@ -345,9 +364,16 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
         'batch_size': 256,
         'lr': hp_lr,
         'classifier': best_path,
+        'normal_threshold': round(float(normal_threshold), 4) if normal_threshold is not None else None,
+        'threshold_start': threshold_start,
+        'threshold_end': threshold_end,
+        'threshold_step': threshold_step,
+        'threshold_lambda': threshold_lambda,
     }
     if exp_tag:
         save_params['exp_tag'] = exp_tag
+    if pretrained_model_path:
+        save_params['pretrained_model_path'] = pretrained_model_path
     # 保存 BOHB 最优超参数
     if hasattr(fedpcnn, 'bohb_best_params'):
         save_params['bohb_best_params'] = fedpcnn.bohb_best_params
@@ -367,6 +393,7 @@ def run_fedpcnn(dataset_name='NSL-KDD', partition_type='iid', alpha=0.5, device=
     # 更新模型权重（含评估结果和分类器）
     model_state['best_path'] = best_path
     model_state['metrics'] = metrics
+    model_state['normal_threshold'] = normal_threshold
     if hasattr(fedpcnn, 'svm_classifier') and fedpcnn.svm_classifier is not None:
         model_state['xgb_classifier'] = fedpcnn.svm_classifier
     if hasattr(fedpcnn, 'bohb_best_params'):
@@ -1026,6 +1053,16 @@ if __name__ == '__main__':
                         help='XGBoost BOHB超参搜索试验次数 (0=禁用, 推荐30)')
     parser.add_argument('--exp-tag', type=str, default='',
                         help='实验标签：用于区分结果文件、模型文件和checkpoint，避免多组实验互相覆盖')
+    parser.add_argument('--pretrained-model-path', type=str, default='',
+                        help='加载已有主干模型并跳过 FL 训练，只重跑分类器/门限/评估')
+    parser.add_argument('--threshold-start', type=float, default=0.30,
+                        help='Normal 门限搜索起点')
+    parser.add_argument('--threshold-end', type=float, default=0.75,
+                        help='Normal 门限搜索终点')
+    parser.add_argument('--threshold-step', type=float, default=0.025,
+                        help='Normal 门限搜索步长')
+    parser.add_argument('--threshold-lambda', type=float, default=5.0,
+                        help='Normal 门限搜索中的 FAR 惩罚系数')
 
     args = parser.parse_args()
 
@@ -1048,7 +1085,12 @@ if __name__ == '__main__':
                         args.global_rounds, args.local_epochs, args.classification,
                         dynamic_agg=not args.no_dynamic_agg,
                         bohb_trials=args.bohb,
-                        exp_tag=args.exp_tag or None)
+                        exp_tag=args.exp_tag or None,
+                        pretrained_model_path=args.pretrained_model_path or None,
+                        threshold_start=args.threshold_start,
+                        threshold_end=args.threshold_end,
+                        threshold_step=args.threshold_step,
+                        threshold_lambda=args.threshold_lambda)
         elif args.model == 'fedpcnn-2stage':
             run_fedpcnn_two_stage(args.dataset, args.partition, args.alpha, device,
                                   args.global_rounds, args.local_epochs, args.classification,
